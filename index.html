@@ -2,7 +2,7 @@
 <html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>BotXlab - Docs & Dashboard</title>
     
     <!-- Tailwind CSS -->
@@ -61,7 +61,6 @@
         body { 
             background-color: #0d1117; 
             color: #c9d1d9;
-            /* Subtle lighting effect */
             background-image: 
                 radial-gradient(circle at 15% 50%, rgba(88, 166, 255, 0.04), transparent 25%),
                 radial-gradient(circle at 85% 30%, rgba(163, 113, 247, 0.04), transparent 25%);
@@ -81,7 +80,9 @@
             letter-spacing: -0.02em; border-bottom: 1px solid #21262d; padding-bottom: 0.3em;
             scroll-margin-top: 100px;
         }
-        .markdown-body h1 { font-size: 2.2em; border-bottom: none; } 
+        .markdown-body h1 { font-size: 1.8em; border-bottom: none; } 
+        @media (min-width: 768px) { .markdown-body h1 { font-size: 2.2em; } }
+        
         .markdown-body h3 { color: #f0f6fc; margin-top: 1.5em; font-weight: 600; }
         .markdown-body a { color: #58a6ff; text-decoration: none; transition: color 0.2s; }
         .markdown-body a:hover { color: #79c0ff; text-decoration: underline; }
@@ -89,17 +90,19 @@
         .markdown-body ul { padding-left: 1.5em; list-style-type: disc; margin-bottom: 1.2em; }
         .markdown-body li { margin-bottom: 0.4em; }
         
-        /* Enhanced Code Blocks */
+        /* Enhanced Code Blocks with scrolling */
         .markdown-body pre { 
-            background-color: #161b22; padding: 1.2em; overflow: auto; 
+            background-color: #161b22; padding: 1.2em; overflow-x: auto; 
             border-radius: 8px; margin-bottom: 1.5em; border: 1px solid #30363d; 
             position: relative; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            max-width: 100%;
         }
         .markdown-body code { 
             background-color: rgba(110,118,129,0.15); padding: 0.2em 0.4em; 
             border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 0.9em; color: #e6edf3;
+            word-wrap: break-word; /* Ensure inline code breaks if needed */
         }
-        .markdown-body pre code { background-color: transparent; padding: 0; color: inherit; }
+        .markdown-body pre code { background-color: transparent; padding: 0; color: inherit; word-wrap: normal; }
         
         .copy-btn {
             position: absolute; top: 10px; right: 10px;
@@ -113,12 +116,11 @@
         .markdown-body blockquote { 
             border-left: 3px solid #30363d; padding: 0.5em 1em; color: #8b949e; background: rgba(22, 27, 34, 0.5);
         }
-        .markdown-body img { max-width: 100%; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
-        .markdown-body table { border-collapse: collapse; width: 100%; margin-bottom: 1.5em; font-size: 0.95em; }
-        .markdown-body th, .markdown-body td { border: 1px solid #30363d; padding: 8px 16px; }
+        .markdown-body img { max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+        .markdown-body table { border-collapse: collapse; width: 100%; margin-bottom: 1.5em; font-size: 0.95em; display: block; overflow-x: auto; }
+        .markdown-body th, .markdown-body td { border: 1px solid #30363d; padding: 8px 16px; min-width: 100px; }
         .markdown-body th { background-color: #161b22; font-weight: 600; text-align: left; }
 
-        /* Glassmorphism Panels */
         .glass-panel {
             background: rgba(22, 27, 34, 0.7);
             backdrop-filter: blur(16px);
@@ -127,39 +129,19 @@
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
         }
         
-        /* Navigation Tabs Animation */
-        .nav-item {
-            position: relative;
-            color: #8b949e;
-            transition: color 0.3s ease;
-        }
+        .nav-item { position: relative; color: #8b949e; transition: color 0.3s ease; white-space: nowrap; }
         .nav-item::after {
-            content: '';
-            position: absolute;
-            bottom: -1px;
-            left: 0;
-            width: 100%;
-            height: 2px;
-            background: #58a6ff;
-            transform: scaleX(0);
-            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            transform-origin: center;
-            box-shadow: 0 -2px 6px rgba(88, 166, 255, 0.4);
+            content: ''; position: absolute; bottom: -1px; left: 0; width: 100%; height: 2px;
+            background: #58a6ff; transform: scaleX(0); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transform-origin: center; box-shadow: 0 -2px 6px rgba(88, 166, 255, 0.4);
         }
         .nav-item:hover { color: #c9d1d9; }
         .nav-item.active { color: #f0f6fc; }
         .nav-item.active::after { transform: scaleX(1); }
         
-        /* Auto TOC Styles */
         .toc-link {
-            display: block;
-            padding: 4px 0 4px 16px;
-            color: #8b949e;
-            font-size: 0.85rem;
-            text-decoration: none;
-            border-left: 2px solid transparent;
-            transition: all 0.2s ease;
-            position: relative;
+            display: block; padding: 4px 0 4px 16px; color: #8b949e; font-size: 0.85rem;
+            text-decoration: none; border-left: 2px solid transparent; transition: all 0.2s ease; position: relative;
         }
         .toc-link:hover { color: #58a6ff; }
         .toc-link::before {
@@ -174,49 +156,43 @@
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-        /* Skeleton Animation */
         .skeleton {
             background-color: #21262d;
-            background-image: linear-gradient(
-                90deg,
-                rgba(255, 255, 255, 0) 0,
-                rgba(255, 255, 255, 0.05) 20%,
-                rgba(255, 255, 255, 0.1) 60%,
-                rgba(255, 255, 255, 0)
-            );
-            background-size: 200px 100%;
-            background-repeat: no-repeat;
-            background-position: -200px 0;
+            background-image: linear-gradient(90deg, rgba(255, 255, 255, 0) 0, rgba(255, 255, 255, 0.05) 20%, rgba(255, 255, 255, 0.1) 60%, rgba(255, 255, 255, 0));
+            background-size: 200px 100%; background-repeat: no-repeat; background-position: -200px 0;
             animation: skeleton-load 1.5s infinite;
         }
-
-        @keyframes skeleton-load {
-            to {
-                background-position: calc(100% + 200px) 0;
-            }
-        }
+        @keyframes skeleton-load { to { background-position: calc(100% + 200px) 0; } }
     </style>
 </head>
 <body class="h-screen flex overflow-hidden selection:bg-github-accent selection:text-white font-sans text-sm">
 
+    <!-- Mobile Overlay -->
+    <div id="mobile-overlay" onclick="toggleMobileSidebar()" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 hidden md:hidden transition-opacity duration-300"></div>
+
     <!-- Sidebar -->
-    <aside class="w-72 bg-[#010409]/95 border-r border-github-border flex flex-col flex-shrink-0 z-30 shadow-2xl backdrop-blur-md" id="sidebar">
+    <aside id="sidebar" class="fixed inset-y-0 left-0 z-50 w-72 bg-[#010409]/95 border-r border-github-border flex flex-col flex-shrink-0 transform -translate-x-full md:relative md:translate-x-0 transition-transform duration-300 ease-in-out shadow-2xl backdrop-blur-md">
         <!-- Sidebar Header -->
-        <div class="p-5">
-            <button onclick="showDashboard()" class="w-full flex items-center gap-3 text-lg font-bold text-white tracking-tight hover:opacity-80 transition-opacity mb-6 group">
-                <div class="w-8 h-8 bg-gradient-to-br from-blue-600 to-indigo-600 text-white rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/20 group-hover:shadow-blue-500/40 transition-all duration-300">
-                    <i data-lucide="box" class="w-5 h-5"></i>
-                </div>
-                BotXlab
-            </button>
+        <div class="p-5 flex-shrink-0">
+            <div class="flex items-center justify-between mb-6">
+                <button onclick="showDashboard()" class="flex items-center gap-3 text-lg font-bold text-white tracking-tight hover:opacity-80 transition-opacity group">
+                    <div class="w-8 h-8 bg-gradient-to-br from-blue-600 to-indigo-600 text-white rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/20 group-hover:shadow-blue-500/40 transition-all duration-300">
+                        <i data-lucide="box" class="w-5 h-5"></i>
+                    </div>
+                    BotXlab
+                </button>
+                <!-- Close Button (Mobile Only) -->
+                <button onclick="toggleMobileSidebar()" class="md:hidden text-github-muted hover:text-white p-1">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
             
             <div class="relative group">
                 <i data-lucide="search" class="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-github-muted group-focus-within:text-github-accent transition-colors"></i>
-                <input type="text" id="search-input" placeholder="Search repositories..." 
+                <input type="text" id="search-input" placeholder="Search..." 
                     class="w-full bg-[#0d1117] border border-github-border rounded-lg py-2 pl-10 pr-12 text-sm text-white placeholder-github-muted focus:border-github-accent focus:outline-none focus:ring-1 focus:ring-github-accent/50 transition-all shadow-sm">
-                <!-- Keyboard Shortcut Hint -->
                 <div class="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none flex items-center gap-1">
-                    <span class="text-[10px] text-github-muted bg-github-border/50 px-1.5 py-0.5 rounded font-mono border border-github-border/50">⌘K</span>
+                    <span class="text-[10px] text-github-muted bg-github-border/50 px-1.5 py-0.5 rounded font-mono border border-github-border/50 hidden lg:inline">⌘K</span>
                 </div>
             </div>
         </div>
@@ -234,14 +210,14 @@
         </div>
 
         <!-- Sidebar Footer -->
-        <div class="p-4 border-t border-github-border flex justify-between items-center bg-[#010409]">
+        <div class="p-4 border-t border-github-border flex justify-between items-center bg-[#010409] flex-shrink-0">
             <div class="flex items-center gap-3">
                 <button onclick="openSettings()" class="text-github-muted hover:text-white transition-colors p-1.5 hover:bg-github-border rounded-md" title="API Settings">
                     <i data-lucide="settings" class="w-4 h-4"></i>
                 </button>
                 <span class="flex items-center gap-2 text-[10px] text-github-muted font-mono uppercase tracking-wide opacity-70">
                     <span id="auto-sync-status" class="w-1.5 h-1.5 rounded-full bg-github-muted"></span>
-                    <span id="last-sync-time">Just now</span>
+                    <span id="last-sync-time" class="hidden sm:inline">Just now</span>
                 </span>
             </div>
             <button onclick="autoDiscoverRepos(true)" class="text-github-muted hover:text-white transition-colors p-1.5 hover:bg-github-border rounded-md" title="Force Refresh">
@@ -251,47 +227,53 @@
     </aside>
 
     <!-- Main Content -->
-    <main class="flex-1 flex flex-col h-full relative overflow-hidden">
+    <main class="flex-1 flex flex-col h-full relative overflow-hidden bg-[#0d1117]">
         
         <!-- Top Navigation Bar -->
-        <header class="h-16 border-b border-github-border bg-[#0d1117]/80 backdrop-blur-md flex items-center justify-between px-8 sticky top-0 z-20 shrink-0 shadow-sm">
-            <div class="flex items-center gap-6 overflow-hidden w-full h-full">
-                <!-- Back Button (Mobile/Context) -->
-                <button onclick="showDashboard()" id="back-dash-btn" class="hidden p-2 hover:bg-github-border rounded-lg text-github-muted hover:text-white transition-colors">
+        <header class="h-14 md:h-16 border-b border-github-border bg-[#0d1117]/90 backdrop-blur-md flex items-center justify-between px-3 md:px-8 sticky top-0 z-20 shrink-0 shadow-sm transition-all w-full">
+            <div class="flex items-center gap-2 md:gap-6 overflow-hidden w-full h-full">
+                
+                <!-- Mobile Menu Button -->
+                <button onclick="toggleMobileSidebar()" class="md:hidden text-github-muted hover:text-white p-1 shrink-0">
+                    <i data-lucide="menu" class="w-5 h-5"></i>
+                </button>
+
+                <!-- Back Button (Context) -->
+                <button onclick="showDashboard()" id="back-dash-btn" class="hidden p-1.5 md:p-2 hover:bg-github-border rounded-lg text-github-muted hover:text-white transition-colors shrink-0">
                     <i data-lucide="layout-grid" class="w-5 h-5"></i>
                 </button>
                 
-                <!-- Breadcrumbs / Title -->
-                <div class="flex flex-col overflow-hidden justify-center h-full">
+                <!-- Title & Context (Flexible) -->
+                <div class="flex flex-col justify-center h-full min-w-0 flex-1 overflow-hidden">
                     <div class="flex items-center gap-2">
-                        <span class="text-github-muted text-sm font-light hidden md:inline opacity-60">BotXlab /</span>
-                        <h2 id="header-title" class="text-base font-semibold text-white truncate tracking-tight">Dashboard</h2>
+                        <span class="text-github-muted text-sm font-light hidden lg:inline opacity-60">BotXlab /</span>
+                        <h2 id="header-title" class="text-sm md:text-base font-semibold text-white truncate tracking-tight">Dashboard</h2>
                     </div>
                     
-                    <!-- Smart Context Bar (Visible on Project View) -->
-                    <div id="smart-context" class="hidden flex items-center gap-3 mt-0.5 text-xs text-github-muted overflow-x-auto hide-scrollbar">
+                    <!-- Smart Context Bar (Scrollable on Mobile) -->
+                    <div id="smart-context" class="hidden flex items-center gap-3 mt-0.5 text-xs text-github-muted overflow-x-auto hide-scrollbar whitespace-nowrap">
                           <!-- Injected via JS -->
                     </div>
                 </div>
 
-                <!-- Tabs (Visible only when repo selected) -->
-                <div id="repo-tabs" class="hidden flex items-center gap-8 ml-auto h-full flex-shrink-0">
-                    <button onclick="switchTab('readme')" id="tab-readme" class="nav-item active h-full flex items-center gap-2 text-sm font-medium px-1 relative">
-                        <i data-lucide="book-open" class="w-4 h-4 opacity-70"></i> <span class="hidden md:inline">README</span>
+                <!-- Tabs (Flexible Container, No Shrink-0 forcing) -->
+                <div id="repo-tabs" class="hidden flex items-center gap-2 md:gap-6 ml-auto h-full min-w-0 overflow-x-auto hide-scrollbar pl-2 mask-linear">
+                    <button onclick="switchTab('readme')" id="tab-readme" class="nav-item active h-full flex items-center gap-2 text-sm font-medium px-1 relative shrink-0">
+                        <i data-lucide="book-open" class="w-4 h-4 opacity-70"></i> <span class="hidden lg:inline">README</span>
                     </button>
-                    <button onclick="switchTab('releases')" id="tab-releases" class="nav-item h-full flex items-center gap-2 text-sm font-medium px-1 relative">
-                        <i data-lucide="tag" class="w-4 h-4 opacity-70"></i> <span class="hidden md:inline">Releases</span>
+                    <button onclick="switchTab('releases')" id="tab-releases" class="nav-item h-full flex items-center gap-2 text-sm font-medium px-1 relative shrink-0">
+                        <i data-lucide="tag" class="w-4 h-4 opacity-70"></i> <span class="hidden lg:inline">Releases</span>
                     </button>
-                    <button onclick="switchTab('commits')" id="tab-commits" class="nav-item h-full flex items-center gap-2 text-sm font-medium px-1 relative">
-                        <i data-lucide="git-commit" class="w-4 h-4 opacity-70"></i> <span class="hidden md:inline">Commits</span>
+                    <button onclick="switchTab('commits')" id="tab-commits" class="nav-item h-full flex items-center gap-2 text-sm font-medium px-1 relative shrink-0">
+                        <i data-lucide="git-commit" class="w-4 h-4 opacity-70"></i> <span class="hidden lg:inline">Commits</span>
                     </button>
-                    <button onclick="switchTab('collaborators')" id="tab-collaborators" class="nav-item h-full flex items-center gap-2 text-sm font-medium px-1 relative">
-                        <i data-lucide="users" class="w-4 h-4 opacity-70"></i> <span class="hidden md:inline">Collaborators</span>
+                    <button onclick="switchTab('collaborators')" id="tab-collaborators" class="nav-item h-full flex items-center gap-2 text-sm font-medium px-1 relative shrink-0">
+                        <i data-lucide="users" class="w-4 h-4 opacity-70"></i> <span class="hidden lg:inline">Collaborators</span>
                     </button>
                 </div>
 
-                <!-- Right Side Actions -->
-                <div id="header-actions" class="hidden md:flex ml-6 items-center gap-3 border-l border-github-border pl-6 h-8 my-auto">
+                <!-- Right Side Actions (Fixed, No Shrink) -->
+                <div id="header-actions" class="flex ml-2 md:ml-4 items-center gap-1 md:gap-3 border-l border-github-border pl-2 md:pl-4 h-8 my-auto shrink-0">
                     <!-- Actions injected via JS -->
                 </div>
             </div>
@@ -299,45 +281,45 @@
 
         <!-- Content Area -->
         <div id="content-scroll" class="flex-1 overflow-y-auto scroll-smooth">
-            <div class="max-w-7xl mx-auto p-8 min-h-full">
+            <div class="max-w-7xl mx-auto p-4 md:p-8 min-h-full">
                 
                 <!-- DASHBOARD VIEW -->
                 <div id="dashboard-view" class="animate-fade-in">
                     <!-- Hero Stats -->
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 mb-8 md:mb-10">
                         <!-- Stat Card 1 -->
-                        <div class="glass-panel rounded-xl p-6 relative overflow-hidden group hover:border-blue-500/30 transition-all duration-300">
+                        <div class="glass-panel rounded-xl p-5 md:p-6 relative overflow-hidden group hover:border-blue-500/30 transition-all duration-300">
                             <div class="absolute -right-6 -top-6 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl group-hover:bg-blue-500/20 transition-all duration-500"></div>
                             <div class="relative z-10">
                                 <div class="flex items-center justify-between mb-2">
                                     <p class="text-github-muted text-xs font-bold uppercase tracking-wider">Total Projects</p>
                                     <i data-lucide="folder-git-2" class="w-4 h-4 text-blue-400 opacity-80"></i>
                                 </div>
-                                <div class="text-4xl font-bold text-white tracking-tight" id="stat-total-repos">0</div>
+                                <div class="text-3xl md:text-4xl font-bold text-white tracking-tight" id="stat-total-repos">0</div>
                             </div>
                         </div>
                         
                         <!-- Stat Card 2 -->
-                        <div class="glass-panel rounded-xl p-6 relative overflow-hidden group hover:border-yellow-500/30 transition-all duration-300">
+                        <div class="glass-panel rounded-xl p-5 md:p-6 relative overflow-hidden group hover:border-yellow-500/30 transition-all duration-300">
                             <div class="absolute -right-6 -top-6 w-32 h-32 bg-yellow-500/10 rounded-full blur-3xl group-hover:bg-yellow-500/20 transition-all duration-500"></div>
                             <div class="relative z-10">
                                 <div class="flex items-center justify-between mb-2">
                                     <p class="text-github-muted text-xs font-bold uppercase tracking-wider">Total Stars</p>
                                     <i data-lucide="star" class="w-4 h-4 text-yellow-400 opacity-80"></i>
                                 </div>
-                                <div class="text-4xl font-bold text-white tracking-tight" id="stat-total-stars">0</div>
+                                <div class="text-3xl md:text-4xl font-bold text-white tracking-tight" id="stat-total-stars">0</div>
                             </div>
                         </div>
                         
                         <!-- Stat Card 3 -->
-                        <div class="glass-panel rounded-xl p-6 relative overflow-hidden group hover:border-purple-500/30 transition-all duration-300">
+                        <div class="glass-panel rounded-xl p-5 md:p-6 relative overflow-hidden group hover:border-purple-500/30 transition-all duration-300">
                             <div class="absolute -right-6 -top-6 w-32 h-32 bg-purple-500/10 rounded-full blur-3xl group-hover:bg-purple-500/20 transition-all duration-500"></div>
                             <div class="relative z-10">
                                 <div class="flex items-center justify-between mb-2">
                                     <p class="text-github-muted text-xs font-bold uppercase tracking-wider">Top Language</p>
                                     <i data-lucide="code-2" class="w-4 h-4 text-purple-400 opacity-80"></i>
                                 </div>
-                                <div class="text-4xl font-bold text-white tracking-tight truncate" id="stat-top-lang">-</div>
+                                <div class="text-3xl md:text-4xl font-bold text-white tracking-tight truncate" id="stat-top-lang">-</div>
                             </div>
                         </div>
                     </div>
@@ -355,7 +337,7 @@
                 </div>
 
                 <!-- PROJECT VIEW -->
-                <div id="project-view" class="hidden animate-fade-in flex gap-8">
+                <div id="project-view" class="hidden animate-fade-in flex flex-col xl:flex-row gap-6 md:gap-8">
                     
                     <!-- Main Content Column -->
                     <div class="flex-1 min-w-0">
@@ -382,7 +364,7 @@
 
                         <!-- COLLABORATORS TAB CONTENT -->
                         <div id="content-collaborators" class="hidden animate-slide-up">
-                            <div id="collaborators-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                            <div id="collaborators-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                 <!-- Collaborators injected here -->
                             </div>
                         </div>
@@ -397,15 +379,15 @@
                         </div>
                     </div>
 
-                    <!-- Right Sidebar (TOC) - Only visible on README tab -->
-                    <div id="toc-sidebar" class="hidden w-72 flex-shrink-0 relative">
+                    <!-- Right Sidebar (TOC) - Only visible on README tab on large screens -->
+                    <div id="toc-sidebar" class="hidden w-full xl:w-72 flex-shrink-0 relative">
                         <div class="sticky top-6">
                             <div class="glass-panel rounded-xl p-5 border-l-4 border-l-github-accent/50">
                                 <h4 class="text-xs font-bold text-white mb-4 uppercase tracking-widest flex items-center gap-2">
                                     <i data-lucide="list" class="w-3 h-3 text-github-accent"></i>
                                     On this page
                                 </h4>
-                                <nav id="toc-content" class="space-y-1 max-h-[70vh] overflow-y-auto pr-2 custom-scrollbar">
+                                <nav id="toc-content" class="space-y-1 max-h-[40vh] xl:max-h-[70vh] overflow-y-auto pr-2 custom-scrollbar">
                                     <!-- TOC generated here -->
                                 </nav>
                             </div>
@@ -419,7 +401,7 @@
     </main>
 
     <!-- Settings Modal -->
-    <div id="settings-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div id="settings-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] hidden flex items-center justify-center p-4">
         <div class="bg-[#161b22] border border-github-border rounded-xl shadow-2xl w-full max-w-md p-6 transform transition-all scale-100 relative overflow-hidden">
             <!-- Decorative blur -->
             <div class="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
@@ -471,11 +453,10 @@
 
     <script>
         // --- Configuration & State ---
-        // Mise à jour de la clé de cache en v6 pour forcer le rechargement des données (incluant clone_url)
         const state = {
             repos: JSON.parse(localStorage.getItem('botxlab_cache_v6')) || [],
             token: localStorage.getItem('botxlab_token') || '',
-            org: localStorage.getItem('botxlab_org') || 'botxlab', // Default to botxlab
+            org: localStorage.getItem('botxlab_org') || 'botxlab', 
             currentRepo: null,
             lastSync: parseInt(localStorage.getItem('botxlab_last_sync_v6')) || 0,
             activeTab: 'readme'
@@ -488,6 +469,10 @@
             dashboardView: document.getElementById('dashboard-view'),
             projectView: document.getElementById('project-view'),
             recentGrid: document.getElementById('recent-grid'),
+            
+            // Layout
+            sidebar: document.getElementById('sidebar'),
+            mobileOverlay: document.getElementById('mobile-overlay'),
             
             // Settings
             settingsModal: document.getElementById('settings-modal'),
@@ -534,136 +519,81 @@
             lastSyncTime: document.getElementById('last-sync-time')
         };
 
+        // --- Mobile Sidebar Logic ---
+        function toggleMobileSidebar() {
+            const isHidden = els.sidebar.classList.contains('-translate-x-full');
+            
+            if (isHidden) {
+                // Open
+                els.sidebar.classList.remove('-translate-x-full');
+                els.mobileOverlay.classList.remove('hidden');
+            } else {
+                // Close
+                els.sidebar.classList.add('-translate-x-full');
+                els.mobileOverlay.classList.add('hidden');
+            }
+        }
+
         // --- Keyboard Shortcuts ---
         document.addEventListener('keydown', (e) => {
-            // Ctrl/Cmd + K to search
             if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
                 e.preventDefault();
-                els.searchInput.focus();
+                // If mobile and sidebar closed, open it first
+                if (window.innerWidth < 768 && els.sidebar.classList.contains('-translate-x-full')) {
+                    toggleMobileSidebar();
+                    setTimeout(() => els.searchInput.focus(), 300); // Wait for animation
+                } else {
+                    els.searchInput.focus();
+                }
             }
-            // Escape to close/clear
             if (e.key === 'Escape') {
                 if (!els.settingsModal.classList.contains('hidden')) {
                     closeSettings();
                 } else if (document.activeElement === els.searchInput) {
                     els.searchInput.blur();
+                } else if (!els.mobileOverlay.classList.contains('hidden')) {
+                    toggleMobileSidebar();
                 } else if (els.searchInput.value) {
                     els.searchInput.value = '';
-                    renderSidebar(); // Reset filter
+                    renderSidebar();
                 }
             }
         });
 
-        // --- Skeleton Loading Helpers ---
+        // --- Skeleton Loading Helpers (Simplified for brevity) ---
         function renderSkeleton(type, count = 1) {
             let html = '';
-            
             if (type === 'sidebar') {
                 for(let i=0; i<6; i++) {
-                    html += `
-                        <div class="px-3 py-2.5 flex items-center gap-3 animate-pulse">
-                            <div class="w-1.5 h-1.5 rounded-full bg-github-border"></div>
-                            <div class="h-4 bg-github-border rounded w-3/4"></div>
-                        </div>
-                    `;
+                    html += `<div class="px-3 py-2.5 flex items-center gap-3 animate-pulse"><div class="w-1.5 h-1.5 rounded-full bg-github-border"></div><div class="h-4 bg-github-border rounded w-3/4"></div></div>`;
                 }
-            }
-            else if (type === 'card') {
-                 // For dashboard grid
+            } else if (type === 'card') {
                  for(let i=0; i<6; i++) {
-                    html += `
-                        <div class="glass-panel p-6 rounded-xl animate-pulse">
-                            <div class="flex justify-between items-start mb-4">
-                                <div class="flex items-center gap-2.5 w-full">
-                                    <div class="w-6 h-6 bg-github-border rounded"></div>
-                                    <div class="h-5 bg-github-border rounded w-1/2"></div>
-                                </div>
-                            </div>
-                            <div class="space-y-2 mb-6">
-                                <div class="h-3 bg-github-border rounded w-full"></div>
-                                <div class="h-3 bg-github-border rounded w-4/5"></div>
-                            </div>
-                            <div class="flex justify-between mt-auto pt-4 border-t border-white/5">
-                                <div class="w-12 h-3 bg-github-border rounded"></div>
-                                <div class="w-8 h-3 bg-github-border rounded"></div>
-                            </div>
-                        </div>
-                    `;
+                    html += `<div class="glass-panel p-6 rounded-xl animate-pulse"><div class="flex justify-between items-start mb-4"><div class="flex items-center gap-2.5 w-full"><div class="w-6 h-6 bg-github-border rounded"></div><div class="h-5 bg-github-border rounded w-1/2"></div></div></div><div class="space-y-2 mb-6"><div class="h-3 bg-github-border rounded w-full"></div><div class="h-3 bg-github-border rounded w-4/5"></div></div><div class="flex justify-between mt-auto pt-4 border-t border-white/5"><div class="w-12 h-3 bg-github-border rounded"></div><div class="w-8 h-3 bg-github-border rounded"></div></div></div>`;
                  }
-            }
-            else if (type === 'readme') {
-                html = `
-                    <div class="animate-pulse space-y-6 max-w-3xl">
-                        <div class="h-10 bg-github-border rounded w-1/3 mb-8"></div>
-                        <div class="space-y-3">
-                            <div class="h-4 bg-github-border rounded w-full"></div>
-                            <div class="h-4 bg-github-border rounded w-full"></div>
-                            <div class="h-4 bg-github-border rounded w-3/4"></div>
-                        </div>
-                        <div class="h-40 bg-github-border rounded w-full my-6"></div>
-                        <div class="space-y-3">
-                            <div class="h-4 bg-github-border rounded w-full"></div>
-                            <div class="h-4 bg-github-border rounded w-5/6"></div>
-                        </div>
-                    </div>
-                `;
-            }
-            else if (type === 'releases') {
+            } else if (type === 'readme') {
+                html = `<div class="animate-pulse space-y-6 max-w-3xl"><div class="h-10 bg-github-border rounded w-1/3 mb-8"></div><div class="space-y-3"><div class="h-4 bg-github-border rounded w-full"></div><div class="h-4 bg-github-border rounded w-full"></div><div class="h-4 bg-github-border rounded w-3/4"></div></div><div class="h-40 bg-github-border rounded w-full my-6"></div></div>`;
+            } else if (type === 'releases') {
                 for(let i=0; i<2; i++) {
-                    html += `
-                        <div class="glass-panel p-6 rounded-xl border border-github-border mb-6 animate-pulse">
-                            <div class="flex justify-between items-start mb-4">
-                                <div class="w-1/2">
-                                    <div class="h-6 bg-github-border rounded w-1/3 mb-2"></div>
-                                    <div class="h-3 bg-github-border rounded w-1/4"></div>
-                                </div>
-                                <div class="w-20 h-8 bg-github-border rounded"></div>
-                            </div>
-                            <div class="space-y-2 mt-4">
-                                <div class="h-3 bg-github-border rounded w-full"></div>
-                                <div class="h-3 bg-github-border rounded w-full"></div>
-                                <div class="h-3 bg-github-border rounded w-2/3"></div>
-                            </div>
-                        </div>
-                    `;
+                    html += `<div class="glass-panel p-6 rounded-xl border border-github-border mb-6 animate-pulse"><div class="flex justify-between items-start mb-4"><div class="w-1/2"><div class="h-6 bg-github-border rounded w-1/3 mb-2"></div><div class="h-3 bg-github-border rounded w-1/4"></div></div><div class="w-20 h-8 bg-github-border rounded"></div></div><div class="space-y-2 mt-4"><div class="h-3 bg-github-border rounded w-full"></div><div class="h-3 bg-github-border rounded w-full"></div></div></div>`;
                 }
-            }
-            else if (type === 'commits') {
+            } else if (type === 'commits') {
                 html += '<div class="glass-panel rounded-xl border border-github-border overflow-hidden animate-pulse">';
                 for(let i=0; i<5; i++) {
-                    html += `
-                        <div class="p-4 border-b border-github-border flex gap-4">
-                            <div class="w-4 h-4 rounded-full bg-github-border"></div>
-                            <div class="flex-1">
-                                <div class="h-4 bg-github-border rounded w-2/3 mb-2"></div>
-                                <div class="h-3 bg-github-border rounded w-1/4"></div>
-                            </div>
-                            <div class="w-16 h-6 bg-github-border rounded"></div>
-                        </div>
-                    `;
+                    html += `<div class="p-4 border-b border-github-border flex gap-4"><div class="w-4 h-4 rounded-full bg-github-border"></div><div class="flex-1"><div class="h-4 bg-github-border rounded w-2/3 mb-2"></div><div class="h-3 bg-github-border rounded w-1/4"></div></div><div class="w-16 h-6 bg-github-border rounded"></div></div>`;
                 }
                 html += '</div>';
-            }
-            else if (type === 'collaborators') {
+            } else if (type === 'collaborators') {
                 for(let i=0; i<6; i++) {
-                    html += `
-                        <div class="glass-panel p-4 rounded-xl border border-github-border flex items-center gap-4 animate-pulse">
-                            <div class="w-12 h-12 rounded-full bg-github-border"></div>
-                            <div class="flex-1">
-                                <div class="h-4 bg-github-border rounded w-1/2 mb-2"></div>
-                                <div class="h-3 bg-github-border rounded w-1/3"></div>
-                            </div>
-                        </div>
-                    `;
+                    html += `<div class="glass-panel p-4 rounded-xl border border-github-border flex items-center gap-4 animate-pulse"><div class="w-12 h-12 rounded-full bg-github-border"></div><div class="flex-1"><div class="h-4 bg-github-border rounded w-1/2 mb-2"></div><div class="h-3 bg-github-border rounded w-1/3"></div></div></div>`;
                 }
             }
-            
             return html;
         }
 
         // --- Utility: Auto Color Generation ---
         function stringToColor(str) {
-            if(!str) return '#8b949e'; // Default gray
+            if(!str) return '#8b949e'; 
             let hash = 0;
             for (let i = 0; i < str.length; i++) {
                 hash = str.charCodeAt(i) + ((hash << 5) - hash);
@@ -755,7 +685,7 @@
         
         function saveSettings() {
             state.token = els.tokenInput.value.trim();
-            state.org = els.orgInput.value.trim() || 'botxlab'; // Default fallback
+            state.org = els.orgInput.value.trim() || 'botxlab';
             
             localStorage.setItem('botxlab_token', state.token);
             localStorage.setItem('botxlab_org', state.org);
@@ -767,17 +697,14 @@
             state.lastSync = 0;
             localStorage.removeItem('botxlab_cache_v6');
             
-            // Trigger refresh
             autoDiscoverRepos(true); 
         }
 
         // --- Data Fetching ---
-
         async function autoDiscoverRepos(force = false) {
             els.syncStatus.className = "w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse";
             els.lastSyncTime.textContent = "Syncing...";
             
-            // Show Skeleton in sidebar if force refresh
             if(force) {
                 els.repoList.innerHTML = renderSkeleton('sidebar');
             }
@@ -786,7 +713,6 @@
                 let url = `https://api.github.com/orgs/${state.org}/repos?sort=updated&per_page=100&type=all`;
                 let response = await fetch(url, { headers: getHeaders() });
                 
-                // Fallback to User if Org 404s
                 if (response.status === 404) {
                      url = `https://api.github.com/users/${state.org}/repos?sort=updated&per_page=100&type=all`;
                      response = await fetch(url, { headers: getHeaders() });
@@ -838,7 +764,6 @@
                 console.warn(error);
                 els.syncStatus.className = "w-1.5 h-1.5 rounded-full bg-red-500";
                 els.lastSyncTime.textContent = "Failed";
-                
                 els.repoList.innerHTML = `<div class="text-xs text-red-400 px-4 py-8 text-center bg-red-500/10 rounded mx-2 mt-4"><i data-lucide="alert-triangle" class="w-5 h-5 mx-auto mb-2"></i><br>${error.message}</div>`;
                 lucide.createIcons();
             }
@@ -858,7 +783,6 @@
         }
 
         // --- Sidebar & Dashboard Rendering ---
-
         function renderSidebar(filter = "") {
             els.repoList.innerHTML = '';
             
@@ -885,7 +809,10 @@
                         </span>
                     </div>
                 `;
-                btn.onclick = () => loadProject(repo);
+                btn.onclick = () => {
+                    loadProject(repo);
+                    if (window.innerWidth < 768) toggleMobileSidebar(); // Close on mobile click
+                };
                 els.repoList.appendChild(btn);
             });
         }
@@ -897,12 +824,11 @@
             els.smartContext.classList.add('hidden');
             els.backBtn.classList.add('hidden');
             els.repoTabs.classList.add('hidden');
-            els.headerActions.innerHTML = ''; // Clear header actions
+            els.headerActions.innerHTML = ''; 
             
             els.projectView.classList.add('hidden');
             els.dashboardView.classList.remove('hidden');
 
-            // Use Skeleton if data is missing, otherwise show cards
             if(state.repos.length === 0) {
                 els.recentGrid.innerHTML = renderSkeleton('card');
             } else {
@@ -950,7 +876,6 @@
         }
 
         // --- Project View Logic ---
-
         function loadProject(repo) {
             state.currentRepo = repo;
             renderSidebar(els.searchInput.value);
@@ -962,9 +887,6 @@
             els.backBtn.classList.remove('hidden');
             els.repoTabs.classList.remove('hidden');
             
-            // Header Actions (Clone & Github Link)
-            // Bouton de clonage avec icône "code" et style identique au bouton GitHub
-            // Modification : Format 'gh repo clone owner/repo'
             const cloneCommand = `gh repo clone ${repo.full_name}`;
 
             els.headerActions.innerHTML = `
@@ -976,27 +898,27 @@
                 </a>
             `;
             
-            // 2. Render Smart Context Bar
+            // Render Smart Context Bar
             let contextHtml = '';
             if (repo.homepage) {
-                contextHtml += `<a href="${repo.homepage}" target="_blank" class="flex items-center gap-1.5 px-2.5 py-1 bg-github-accent/10 text-github-accent rounded-md border border-github-accent/20 hover:bg-github-accent/20 transition-colors">
+                contextHtml += `<a href="${repo.homepage}" target="_blank" class="flex items-center gap-1.5 px-2.5 py-1 bg-github-accent/10 text-github-accent rounded-md border border-github-accent/20 hover:bg-github-accent/20 transition-colors flex-shrink-0">
                     <i data-lucide="globe" class="w-3 h-3"></i> Website
                 </a>`;
             }
-            contextHtml += `<a href="https://github.com/sponsors/${state.org}" target="_blank" class="flex items-center gap-1.5 px-2.5 py-1 bg-pink-500/10 text-pink-400 rounded-md border border-pink-500/20 hover:bg-pink-500/20 transition-colors">
+            contextHtml += `<a href="https://github.com/sponsors/${state.org}" target="_blank" class="flex items-center gap-1.5 px-2.5 py-1 bg-pink-500/10 text-pink-400 rounded-md border border-pink-500/20 hover:bg-pink-500/20 transition-colors flex-shrink-0">
                 <i data-lucide="heart" class="w-3 h-3"></i> Sponsor
             </a>`;
             if (repo.license) {
-                contextHtml += `<span class="flex items-center gap-1.5 px-2.5 py-1 bg-github-card border border-github-border rounded-md text-github-text">
+                contextHtml += `<span class="flex items-center gap-1.5 px-2.5 py-1 bg-github-card border border-github-border rounded-md text-github-text flex-shrink-0">
                     <i data-lucide="scale" class="w-3 h-3 text-github-muted"></i> ${repo.license}
                 </span>`;
             }
              if (repo.open_issues > 0) {
-                contextHtml += `<a href="${repo.html_url}/issues" target="_blank" class="flex items-center gap-1.5 px-2.5 py-1 bg-github-card border border-github-border rounded-md hover:border-github-accent hover:text-white transition-colors">
+                contextHtml += `<a href="${repo.html_url}/issues" target="_blank" class="flex items-center gap-1.5 px-2.5 py-1 bg-github-card border border-github-border rounded-md hover:border-github-accent hover:text-white transition-colors flex-shrink-0">
                     <i data-lucide="circle-dot" class="w-3 h-3 text-github-muted"></i> ${repo.open_issues} Issues
                 </a>`;
             }
-            contextHtml += `<a href="${repo.html_url}/pulls" target="_blank" class="flex items-center gap-1.5 px-2.5 py-1 bg-github-card border border-github-border rounded-md hover:border-github-accent hover:text-white transition-colors">
+            contextHtml += `<a href="${repo.html_url}/pulls" target="_blank" class="flex items-center gap-1.5 px-2.5 py-1 bg-github-card border border-github-border rounded-md hover:border-github-accent hover:text-white transition-colors flex-shrink-0">
                 <i data-lucide="git-pull-request" class="w-3 h-3 text-github-muted"></i> Pull Requests
             </a>`;
             
@@ -1022,12 +944,10 @@
                 document.execCommand('copy');
                 const btn = document.getElementById('btn-clone-url');
                 
-                // Feedback visuel : Icône check verte temporaire
                 btn.innerHTML = `<i data-lucide="check" class="w-5 h-5 text-green-500"></i>`;
                 lucide.createIcons();
                 
                 setTimeout(() => {
-                    // Restauration de l'icône originale
                     btn.innerHTML = `<i data-lucide="code" class="w-5 h-5"></i>`;
                     lucide.createIcons();
                 }, 2000);
@@ -1057,8 +977,8 @@
             els.contentReleases.classList.add('hidden');
             els.contentCommits.classList.add('hidden');
             els.contentCollaborators.classList.add('hidden');
-            els.tocSidebar.classList.add('hidden'); // Hide TOC by default
-            els.tocSidebar.classList.remove('xl:block'); // Ensure override works
+            els.tocSidebar.classList.add('hidden');
+            els.tocSidebar.classList.remove('xl:block'); 
             
             if (tabName === 'readme') {
                 els.contentReadme.classList.remove('hidden');
@@ -1076,7 +996,6 @@
         }
 
         async function fetchReadme() {
-            // Show Skeleton
             els.readmeContainer.innerHTML = renderSkeleton('readme');
             els.contentReadme.classList.remove('hidden');
             els.errorState.classList.add('hidden');
@@ -1094,15 +1013,13 @@
                 els.readmeContainer.innerHTML = fixedHtml;
                 
                 addCopyButtons();
-                generateTOC(); // Generate TOC after rendering
+                generateTOC(); 
                 
-                // Only show sidebar if TOC has content
                 if(els.tocContent.children.length > 0) {
                     els.tocSidebar.classList.remove('hidden');
                     els.tocSidebar.classList.add('xl:block');
                 }
             } catch (err) {
-                // If error, clear skeleton and show error
                 els.readmeContainer.innerHTML = ''; 
                 els.errorState.classList.remove('hidden');
                 els.errorMsg.textContent = err.message;
@@ -1113,7 +1030,7 @@
             const headings = els.readmeContainer.querySelectorAll('h1, h2, h3');
             els.tocContent.innerHTML = '';
             
-            if(headings.length < 2) return; // Don't show TOC for tiny readmes
+            if(headings.length < 2) return; 
 
             headings.forEach((heading, index) => {
                 const id = `toc-${index}`;
@@ -1127,7 +1044,6 @@
                     e.preventDefault();
                     heading.scrollIntoView({ behavior: 'smooth' });
                 };
-                
                 els.tocContent.appendChild(link);
             });
         }
@@ -1144,8 +1060,7 @@
                     
                     const textArea = document.createElement("textarea");
                     textArea.value = code;
-                    textArea.style.position = "fixed"; 
-                    textArea.style.left = "-9999px";
+                    textArea.style.position = "fixed"; textArea.style.left = "-9999px";
                     document.body.appendChild(textArea);
                     textArea.focus();
                     textArea.select();
@@ -1165,13 +1080,11 @@
                     
                     document.body.removeChild(textArea);
                 };
-                
                 pre.appendChild(btn);
             });
         }
 
         async function fetchReleases() {
-            // Show Skeleton
             els.releasesContainer.innerHTML = renderSkeleton('releases');
             els.contentReleases.classList.remove('hidden');
             els.errorState.classList.add('hidden');
@@ -1193,18 +1106,18 @@
                     const html = `
                         <div class="glass-panel p-6 rounded-xl border border-github-border mb-6">
                             <div class="flex justify-between items-start mb-4">
-                                <div>
-                                    <h3 class="text-xl font-bold text-white mb-1.5 flex items-center gap-2">
-                                        ${release.name || release.tag_name}
-                                        <span class="text-[10px] px-2 py-0.5 rounded-full bg-green-500/10 text-green-400 border border-green-500/20 font-mono">Latest</span>
+                                <div class="min-w-0 flex-1">
+                                    <h3 class="text-xl font-bold text-white mb-1.5 flex items-center gap-2 flex-wrap">
+                                        <span class="truncate">${release.name || release.tag_name}</span>
+                                        <span class="text-[10px] px-2 py-0.5 rounded-full bg-green-500/10 text-green-400 border border-green-500/20 font-mono shrink-0">Latest</span>
                                     </h3>
-                                    <div class="flex items-center gap-2 text-xs text-github-muted">
+                                    <div class="flex items-center gap-2 text-xs text-github-muted flex-wrap">
                                         <i data-lucide="calendar" class="w-3.5 h-3.5"></i> ${date}
                                         <span class="mx-1">•</span>
-                                        <span class="font-mono bg-white/5 px-1.5 rounded">${release.tag_name}</span>
+                                        <span class="font-mono bg-white/5 px-1.5 rounded truncate max-w-[150px]">${release.tag_name}</span>
                                     </div>
                                 </div>
-                                <a href="${release.html_url}" target="_blank" class="px-3 py-1.5 text-xs font-medium bg-white/5 hover:bg-white/10 border border-white/10 rounded-md transition-colors text-white">View on GitHub</a>
+                                <a href="${release.html_url}" target="_blank" class="px-3 py-1.5 text-xs font-medium bg-white/5 hover:bg-white/10 border border-white/10 rounded-md transition-colors text-white shrink-0 ml-2">View on GitHub</a>
                             </div>
                             <div class="markdown-body text-sm text-github-text/90">
                                 ${marked.parse(release.body || "*No description provided.*")}
@@ -1213,7 +1126,6 @@
                     `;
                     els.releasesContainer.innerHTML += html;
                 });
-                
                 lucide.createIcons();
             } catch (err) {
                 els.releasesContainer.innerHTML = '';
@@ -1223,7 +1135,6 @@
         }
 
         async function fetchCommits() {
-            // Show Skeleton
             els.commitsContainer.innerHTML = renderSkeleton('commits');
             els.contentCommits.classList.remove('hidden');
             els.errorState.classList.add('hidden');
@@ -1244,18 +1155,18 @@
                     
                     const row = `
                         <div class="p-4 ${!isLast ? 'border-b border-github-border' : ''} hover:bg-white/5 transition-colors flex gap-4 group">
-                            <div class="mt-1">
+                            <div class="mt-1 shrink-0">
                                 <i data-lucide="git-commit" class="w-4 h-4 text-github-muted group-hover:text-github-accent transition-colors"></i>
                             </div>
                             <div class="flex-1 min-w-0">
                                 <p class="text-sm text-white font-mono truncate hover:text-github-accent cursor-pointer transition-colors" title="${msg}">${msg}</p>
-                                <div class="flex items-center gap-2 mt-1.5 text-xs text-github-muted">
-                                    <span class="font-medium text-github-text">${item.commit.author.name}</span>
+                                <div class="flex items-center gap-2 mt-1.5 text-xs text-github-muted flex-wrap">
+                                    <span class="font-medium text-github-text truncate max-w-[120px]">${item.commit.author.name}</span>
                                     <span>•</span>
                                     <span>${date}</span>
                                 </div>
                             </div>
-                            <div class="flex flex-col items-end gap-1">
+                            <div class="flex flex-col items-end gap-1 shrink-0">
                                 <a href="${item.html_url}" target="_blank" class="text-[10px] font-mono text-github-muted hover:text-white bg-white/5 px-2 py-1 rounded border border-white/5 transition-colors">
                                     ${item.sha.substring(0,7)}
                                 </a>
@@ -1264,7 +1175,6 @@
                     `;
                     list.innerHTML += row;
                 });
-                
                 els.commitsContainer.appendChild(list);
                 lucide.createIcons();
             } catch (err) {
@@ -1275,7 +1185,6 @@
         }
 
         async function fetchCollaborators() {
-            // Show Skeleton
             els.collaboratorsGrid.innerHTML = renderSkeleton('collaborators');
             els.contentCollaborators.classList.remove('hidden');
             els.errorState.classList.add('hidden');
@@ -1291,10 +1200,10 @@
                 els.collaboratorsGrid.innerHTML = '';
                 contributors.forEach(user => {
                     const card = document.createElement('div');
-                    card.className = "glass-panel p-4 rounded-xl border border-github-border flex items-center gap-4 hover:border-github-accent/50 transition-all hover:-translate-y-0.5 group";
+                    card.className = "glass-panel p-4 rounded-xl border border-github-border flex items-center gap-4 hover:border-github-accent/50 transition-all hover:-translate-y-0.5 group min-w-0";
                     
                     card.innerHTML = `
-                        <div class="relative">
+                        <div class="relative shrink-0">
                             <img src="${user.avatar_url}" alt="${user.login}" class="w-12 h-12 rounded-full border-2 border-github-border group-hover:border-github-accent/50 transition-colors">
                             <div class="absolute -bottom-1 -right-1 bg-[#0d1117] rounded-full p-0.5">
                                 <div class="bg-green-500 w-2.5 h-2.5 rounded-full border border-[#0d1117]"></div>
@@ -1307,13 +1216,12 @@
                                 ${user.contributions} commits
                             </div>
                         </div>
-                        <a href="${user.html_url}" target="_blank" class="p-2 text-github-muted hover:text-white bg-white/5 hover:bg-white/10 rounded-lg transition-colors">
+                        <a href="${user.html_url}" target="_blank" class="p-2 text-github-muted hover:text-white bg-white/5 hover:bg-white/10 rounded-lg transition-colors shrink-0">
                             <i data-lucide="external-link" class="w-4 h-4"></i>
                         </a>
                     `;
                     els.collaboratorsGrid.appendChild(card);
                 });
-
                 lucide.createIcons();
             } catch (err) {
                 els.collaboratorsGrid.innerHTML = '';
