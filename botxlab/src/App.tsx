@@ -7,8 +7,7 @@ import {
   Box, Search, Settings, RefreshCw, X, Menu, LayoutGrid, 
   BookOpen, Tag, GitCommit, Users, FolderGit2, Star, Code2, 
   Sparkles, Book, Globe, CircleDot,
-  FileWarning, ExternalLink, GitMerge, Shield, Key, User, Info, Check, Calendar, List, Clock,
-  ChevronDown // Ajout de l'icône pour le menu déroulant
+  FileWarning, ExternalLink, GitMerge, Shield, Key, User, Info, Check, Calendar, List, Clock
 } from 'lucide-react';
 
 // --- 1. Interfaces (Typage Strict) ---
@@ -136,12 +135,9 @@ export default function App() {
   const [view, setView] = useState<ViewState>('dashboard');
   const [activeTab, setActiveTab] = useState<TabState>('readme');
   const [searchTerm, setSearchTerm] = useState('');
-  
-  // UI States
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isMobileTabMenuOpen, setIsMobileTabMenuOpen] = useState(false); // État pour le menu burger des onglets
-
+  
   // Loading & Async Data States
   const [reposLoading, setReposLoading] = useState(false);
   const [contentLoading, setContentLoading] = useState(false);
@@ -209,6 +205,7 @@ export default function App() {
       const loadContent = async () => {
         setContentLoading(true);
         setContentError(null);
+        // Reset specific states
         if (activeTab === 'readme') setReadmeContent('');
         
         try {
@@ -250,10 +247,13 @@ export default function App() {
   // --- Optimized TOC Generation ---
   useEffect(() => {
     if (activeTab === 'readme' && readmeContent) {
+      // Use a simpler approach: extract headers from markdown text first (regex) 
+      // OR parse the DOM after render. Using DOM is easier with react-markdown.
+      // We wrap in requestAnimationFrame to ensure DOM is ready.
       requestAnimationFrame(() => {
         const headings = document.querySelectorAll('.markdown-body h1, .markdown-body h2, .markdown-body h3');
         const newToc: TocItem[] = Array.from(headings).map((h, i) => ({
-          id: h.id || `heading-${i}`,
+          id: h.id || `heading-${i}`, // rehype-slug adds IDs, fallback used just in case
           text: h.textContent || '',
           level: parseInt(h.tagName.substring(1))
         }));
@@ -273,6 +273,7 @@ export default function App() {
   const stats = useMemo(() => {
     const totalStars = repos.reduce((acc, r) => acc + (r.stargazers_count || 0), 0);
     const languages = repos.map(r => r.language).filter(Boolean) as string[];
+    // Find most frequent language
     const topLang = languages.sort((a,b) => 
       languages.filter(v => v===a).length - languages.filter(v => v===b).length
     ).pop() || 'None';
@@ -286,8 +287,7 @@ export default function App() {
     setView('project');
     setActiveTab('readme');
     setIsSidebarOpen(false);
-    setIsMobileTabMenuOpen(false); // Reset menu state
-    setSearchTerm('');
+    setSearchTerm(''); // Clear search on open for better UX
   };
 
   const copyCloneCmd = () => {
@@ -298,6 +298,7 @@ export default function App() {
   }
 
   // --- Render Helpers ---
+  // Markdown Image & Link Fixer
   const markdownComponents = {
     img: ({node, ...props}: any) => {
       let url = props.src || '';
@@ -319,20 +320,13 @@ export default function App() {
     }
   };
 
-  const tabs = [
-    { id: 'readme', icon: BookOpen, label: 'README' },
-    { id: 'releases', icon: Tag, label: 'Releases' },
-    { id: 'commits', icon: GitCommit, label: 'Commits' },
-    { id: 'collaborators', icon: Users, label: 'Collaborators' },
-  ];
-
   return (
     <div className="h-screen flex overflow-hidden font-sans text-sm bg-github-bg text-github-text selection:bg-github-accent selection:text-white">
       
       {/* Mobile Overlay */}
       {isSidebarOpen && <div onClick={() => setIsSidebarOpen(false)} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden animate-fade-in" />}
 
-      {/* Sidebar (Main Navigation) */}
+      {/* Sidebar */}
       <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-[#010409]/95 border-r border-github-border flex flex-col transform transition-transform duration-300 md:relative md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} shadow-2xl backdrop-blur-md`}>
         <div className="p-5 flex-shrink-0">
           <div className="flex items-center justify-between mb-6">
@@ -390,7 +384,7 @@ export default function App() {
              <button onClick={() => setIsSettingsOpen(true)} className="text-github-muted hover:text-white transition-colors p-1.5 hover:bg-github-border rounded-md active:scale-95" title="Settings"><Settings className="w-4 h-4" /></button>
              <span className="flex items-center gap-2 text-[10px] text-github-muted font-mono uppercase tracking-wide opacity-70">
                 <span className={`w-1.5 h-1.5 rounded-full ${syncStatus === 'success' ? 'bg-green-500' : syncStatus === 'loading' ? 'bg-blue-500 animate-pulse' : 'bg-red-500'}`}></span>
-                {syncStatus === 'loading' ? 'Sync' : syncStatus === 'success' ? 'Synced' : 'Failed'}
+                {syncStatus === 'loading' ? 'Syncing' : syncStatus === 'success' ? 'Synced' : 'Failed'}
              </span>
            </div>
            <button onClick={() => fetchRepos()} className="text-github-muted hover:text-white transition-colors p-1.5 hover:bg-github-border rounded-md active:scale-95" title="Refresh"><RefreshCw className={`w-3.5 h-3.5 ${reposLoading ? 'animate-spin' : ''}`} /></button>
@@ -398,37 +392,38 @@ export default function App() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col h-full relative overflow-hidden bg-github-bg w-full">
-        {/* Notez le retrait de 'overflow-hidden' sur le header principal pour laisser passer le menu */}
-        <header className="h-14 md:h-16 border-b border-github-border bg-[#0d1117]/90 backdrop-blur-md flex items-center justify-between px-3 md:px-6 sticky top-0 z-30 shrink-0 shadow-sm transition-all w-full">
-          <div className="flex items-center gap-2 md:gap-4 w-full h-full">
-            {/* Bouton Menu Sidebar */}
-            <button onClick={() => setIsSidebarOpen(true)} className="md:hidden text-github-muted hover:text-white p-1 active:scale-95 flex-shrink-0"><Menu className="w-5 h-5" /></button>
+      <main className="flex-1 flex flex-col h-full relative overflow-hidden bg-github-bg">
+        <header className="h-14 md:h-16 border-b border-github-border bg-[#0d1117]/90 backdrop-blur-md flex items-center justify-between px-3 md:px-8 sticky top-0 z-20 shrink-0 shadow-sm transition-all">
+          <div className="flex items-center gap-2 md:gap-6 overflow-hidden w-full h-full">
+            <button onClick={() => setIsSidebarOpen(true)} className="md:hidden text-github-muted hover:text-white p-1 active:scale-95"><Menu className="w-5 h-5" /></button>
             
-            {/* Bouton Retour Dashboard */}
             {view === 'project' && (
-              <button onClick={() => setView('dashboard')} className="hidden p-1.5 md:p-2 hover:bg-github-border rounded-lg text-github-muted hover:text-white transition-colors md:block active:scale-95 flex-shrink-0" title="Back to Dashboard"><LayoutGrid className="w-5 h-5" /></button>
+              <button onClick={() => setView('dashboard')} className="hidden p-1.5 md:p-2 hover:bg-github-border rounded-lg text-github-muted hover:text-white transition-colors md:block active:scale-95" title="Back to Dashboard"><LayoutGrid className="w-5 h-5" /></button>
             )}
 
-            {/* Titre et Infos (C'est ICI qu'on garde l'overflow-hidden pour le texte) */}
-            <div className="flex flex-colXS justify-center h-full min-w-0 flex-1 overflow-hidden">
-               <div className="flex items-center gap-2 animate-fade-in min-w-0">
-                 <span className="text-github-muted text-sm font-light hidden lg:inline opacity-60 whitespace-nowrap">{config.org} /</span>
-                 <h2 className="text-sm md:text-base font-semibold text-white truncate tracking-tight min-w-0">{view === 'dashboard' ? 'Dashboard' : currentRepo?.name}</h2>
+            <div className="flex flex-col justify-center h-full min-w-0 flex-1 overflow-hidden">
+               <div className="flex items-center gap-2 animate-fade-in">
+                 <span className="text-github-muted text-sm font-light hidden lg:inline opacity-60">{config.org} /</span>
+                 <h2 className="text-sm md:text-base font-semibold text-white truncate tracking-tight">{view === 'dashboard' ? 'Dashboard' : currentRepo?.name}</h2>
                </div>
                
                {view === 'project' && currentRepo && (
                  <div className="hidden md:flex items-center gap-3 mt-0.5 text-xs text-github-muted overflow-x-auto hide-scrollbar whitespace-nowrap animate-slide-up">
                     {currentRepo.homepage && <a href={currentRepo.homepage} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 px-2 py-0.5 bg-github-accent/10 text-github-accent rounded border border-github-accent/20 hover:bg-github-accent/20 transition-colors"><Globe className="w-3 h-3" /> Website</a>}
                     <span className="flex items-center gap-1.5 px-2 py-0.5 bg-github-card border border-github-border rounded text-github-text"><Star className="w-3 h-3 text-yellow-500" /> {currentRepo.stargazers_count}</span>
+                    <a href={`${currentRepo.html_url}/issues`} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 px-2 py-0.5 bg-github-card border border-github-border rounded text-github-text hover:border-github-accent transition-colors"><CircleDot className="w-3 h-3 text-github-muted" /> {currentRepo.open_issues_count}</a>
                  </div>
                )}
             </div>
 
-            {/* --- ONGLETS (Desktop) --- */}
             {view === 'project' && (
-              <div className="hidden md:flex items-center gap-6 ml-auto h-full min-w-0 overflow-x-autoPk hide-scrollbar pl-2 mask-linear">
-                 {tabs.map(tab => (
+              <div className="hidden md:flex items-center gap-6 ml-auto h-full min-w-0 overflow-x-auto hide-scrollbar pl-2 mask-linear">
+                 {[
+                   { id: 'readme', icon: BookOpen, label: 'README' },
+                   { id: 'releases', icon: Tag, label: 'Releases' },
+                   { id: 'commits', icon: GitCommit, label: 'Commits' },
+                   { id: 'collaborators', icon: Users, label: 'Collaborators' },
+                 ].map(tab => (
                    <button 
                      key={tab.id}
                      onClick={() => setActiveTab(tab.id as TabState)}
@@ -441,58 +436,10 @@ export default function App() {
                  ))}
               </div>
             )}
-
-            {/* --- ONGLETS (Mobile - Menu Burger Déroulant) --- */}
-            {view === 'project' && (
-              <div className="md:hidden flex items-center ml-2 relative">
-                 <button 
-                    onClick={(e) => {
-                      e.stopPropagation(); // Empêche la fermeture immédiate
-                      setIsMobileTabMenuOpen(!isMobileTabMenuOpen);
-                    }}
-                    className="flex items-center gap-2 text-xs font-medium bg-github-card border border-github-border px-3 py-1.5 rounded-lg text-white active:bg-github-border transition-colors truncate max-w-[140px] z-30 relative"
-                 >
-                    <span className="truncate">{tabs.find(t => t.id === activeTab)?.label}</span>
-                    <ChevronDown className={`w-3 h-3 transition-transform ${isMobileTabMenuOpen ? 'rotate-180' : ''}`} />
-                 </button>
-
-                 {/* Menu Dropdown - CORRECTION Z-INDEX */}
-                 {isMobileTabMenuOpen && (
-                    <>
-                      {/* Overlay invisible pour fermer en cliquant ailleurs */}
-                      <div className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[1px]" onClick={() => setIsMobileTabMenuOpen(false)}></div>
-                      
-                      {/* Le Menu lui-même */}
-                      <div className="absolute top-[120%] right-0 w-56 bg-[#161b22] border border-github-border rounded-xl shadow-2xl z-50 overflow-hidden animate-slide-up flex flex-col ring-1 ring-white/10">
-                        <div className="py-1">
-                          {tabs.map(tab => (
-                            <button
-                              key={tab.id}
-                              onClick={() => {
-                                setActiveTab(tab.id as TabState);
-                                setIsMobileTabMenuOpen(false);
-                              }}
-                              className={`w-full flex items-center gap-3 px-4 py-3 text-sm text-left transition-colors ${
-                                activeTab === tab.id 
-                                  ? 'bg-github-accent/10 text-github-accent border-l-2 border-l-github-accent' 
-                                  : 'text-github-muted hover:text-white hover:bg-white/5 border-l-2 border-l-transparent'
-                              }`}
-                            >
-                              <tab.icon className="w-4 h-4" />
-                              <span className="font-medium">{tab.label}</span>
-                              {activeTab === tab.id && <Check className="w-3.5 h-3.5 ml-auto" />}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </>
-                 )}
-              </div>
-            )}
             
             {view === 'project' && currentRepo && (
                <div className="flex ml-2 md:ml-4 items-center gap-1 md:gap-3 border-l border-github-border pl-2 md:pl-4 h-8 my-auto shrink-0 animate-fade-in">
-                  <button onClick={copyCloneCmd} className="text-github-muted hover:text-white transition-colors p-1.5 hover:bg-github-border rounded-md group relative active:scale-95 hidden sm:block">
+                  <button onClick={copyCloneCmd} className="text-github-muted hover:text-white transition-colors p-1.5 hover:bg-github-border rounded-md group relative active:scale-95">
                     {repoCopied ? <Check className="w-5 h-5 text-green-500 animate-bounce" /> : <Code2 className="w-5 h-5" />}
                   </button>
                   <a href={currentRepo.html_url} target="_blank" rel="noreferrer" className="text-github-muted hover:text-white transition-colors p-1.5 hover:bg-github-border rounded-md active:scale-95"><ExternalLink className="w-5 h-5" /></a>
@@ -500,9 +447,9 @@ export default function App() {
             )}
           </div>
         </header>
-        
-        <div className="flex-1 overflow-y-auto scroll-smooth p-4 md:p-8 w-full">
-           <div className="max-w-7xl mx-auto min-h-full w-full">
+
+        <div className="flex-1 overflow-y-auto scroll-smooth p-4 md:p-8">
+           <div className="max-w-7xl mx-auto min-h-full">
              
              {/* DASHBOARD VIEW */}
              {view === 'dashboard' && (
@@ -552,11 +499,11 @@ export default function App() {
                        repos.slice(0, 6).map(repo => (
                          <div key={repo.id} onClick={() => handleOpenProject(repo)} className="glass-panel p-6 rounded-xl cursor-pointer hover:border-github-accent/50 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-blue-500/10 group flex flex-col h-full">
                             <div className="flex justify-between items-start mb-4">
-                               <div className="flex items-center gap-3 w-full min-w-0">
-                                  <div className="p-2 bg-white/5 rounded-lg group-hover:bg-github-accent/10 transition-colors border border-white/5 flex-shrink-0">
+                               <div className="flex items-center gap-3">
+                                  <div className="p-2 bg-white/5 rounded-lg group-hover:bg-github-accent/10 transition-colors border border-white/5">
                                      <Book className="w-5 h-5 text-github-muted group-hover:text-github-accent transition-colors" />
                                   </div>
-                                  <span className="text-white font-semibold group-hover:text-github-accent transition-colors text-base truncate flex-1 min-w-0">{repo.name}</span>
+                                  <span className="text-white font-semibold group-hover:text-github-accent transition-colors text-base truncate max-w-[180px]">{repo.name}</span>
                                </div>
                             </div>
                             <p className="text-sm text-github-muted mb-6 line-clamp-2 leading-relaxed opacity-80 flex-1">
@@ -569,8 +516,8 @@ export default function App() {
                                      <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: stringToColor(repo.language) }}></span>
                                      <span>{repo.language || 'N/A'}</span>
                                    </div>
-                                   <span className="hidden sm:inline">•</span>
-                                   <span className="flex items-center gap-1 hidden sm:flex"><Clock className="w-3 h-3" /> {timeAgo(repo.updated_at)}</span>
+                                   <span>•</span>
+                                   <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {timeAgo(repo.updated_at)}</span>
                                </div>
                                <div className="flex items-center gap-1.5 bg-white/5 px-2 py-1 rounded-md border border-white/5">
                                   <Star className="w-3.5 h-3.5 text-yellow-500" /> {repo.stargazers_count}
@@ -585,7 +532,7 @@ export default function App() {
 
              {/* PROJECT VIEW */}
              {view === 'project' && currentRepo && (
-               <div className="animate-slide-up flex flex-col xl:flex-row gap-8 items-start w-full">
+               <div className="animate-slide-up flex flex-col xl:flex-row gap-8 items-start">
                   <div className="flex-1 min-w-0 w-full">
                      {contentLoading ? (
                         <div className="animate-fade-in p-10 text-center text-github-muted">Loading content...</div>
@@ -598,7 +545,7 @@ export default function App() {
                      ) : (
                        <>
                          {activeTab === 'readme' && (
-                           <article className="markdown-body bg-transparent animate-fade-in overflow-hidden w-full" id="readme-container">
+                           <article className="markdown-body bg-transparent animate-fade-in" id="readme-container">
                               <ReactMarkdown
                                 remarkPlugins={[remarkGfm]}
                                 rehypePlugins={[rehypeRaw, rehypeSlug]}
@@ -612,24 +559,24 @@ export default function App() {
                          {activeTab === 'releases' && (
                            <div className="space-y-6 animate-slide-up">
                               {releases.map((release) => (
-                                <div key={release.id} className="glass-panel p-4 md:p-6 rounded-xl border border-github-border transition-transform hover:scale-[1.005]">
-                                   <div className="flex flex-col md:flex-row justify-between items-start mb-4 gap-4">
+                                <div key={release.id} className="glass-panel p-6 rounded-xl border border-github-border transition-transform hover:scale-[1.005]">
+                                   <div className="flex justify-between items-start mb-4">
                                       <div className="min-w-0 flex-1">
-                                         <h3 className="text-lg md:text-xl font-bold text-white mb-2 flex items-center gap-3 flex-wrap">
-                                            <span className="break-all">{release.name || release.tag_name}</span>
+                                         <h3 className="text-xl font-bold text-white mb-2 flex items-center gap-3 flex-wrap">
+                                            <span className="truncate">{release.name || release.tag_name}</span>
                                             {release.prerelease ? 
-                                               <span className="text-[10px] px-2 py-0.5 rounded-full bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 font-mono flex-shrink-0">Pre-release</span> :
-                                               <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/10 text-green-400 border border-green-500/20 font-mono flex-shrink-0">Latest</span>
+                                               <span className="text-[10px] px-2 py-0.5 rounded-full bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 font-mono">Pre-release</span> :
+                                               <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/10 text-green-400 border border-green-500/20 font-mono">Latest</span>
                                             }
                                          </h3>
-                                         <div className="flex flex-wrap items-center gap-3 text-xs text-github-muted">
+                                         <div className="flex items-center gap-3 text-xs text-github-muted">
                                             <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" /> {new Date(release.published_at).toLocaleDateString()}</span>
                                             <span className="font-mono bg-white/5 px-1.5 py-0.5 rounded border border-white/5">{release.tag_name}</span>
                                          </div>
                                       </div>
-                                      <a href={release.html_url} target="_blank" rel="noreferrer" className="px-4 py-2 text-xs font-medium bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg transition-colors text-white flex-shrink-0 active:scale-95 w-full md:w-auto text-center">View on GitHub</a>
+                                      <a href={release.html_url} target="_blank" rel="noreferrer" className="px-4 py-2 text-xs font-medium bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg transition-colors text-white flex-shrink-0 active:scale-95">View on GitHub</a>
                                    </div>
-                                   <div className="markdown-body text-sm text-github-text/90 mt-4 border-t border-white/5 pt-4 overflow-hidden">
+                                   <div className="markdown-body text-sm text-github-text/90 mt-4 border-t border-white/5 pt-4">
                                       <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{release.body}</ReactMarkdown>
                                    </div>
                                 </div>
@@ -640,19 +587,17 @@ export default function App() {
                          {activeTab === 'commits' && (
                            <div className="glass-panel rounded-xl border border-github-border overflow-hidden animate-slide-up">
                               {commits.map((item, idx) => (
-                                <div key={item.sha} className={`p-4 flex flex-col sm:flex-row gap-4 group hover:bg-white/5 transition-colors ${idx !== commits.length - 1 ? 'border-b border-github-border' : ''}`}>
-                                   <div className="flex items-start gap-3 flex-1 min-w-0">
-                                      <div className="mt-1 shrink-0"><GitCommit className="w-4 h-4 text-github-muted group-hover:text-github-accent transition-colors" /></div>
-                                      <div className="min-w-0">
-                                         <p className="text-sm text-white font-mono break-words hover:text-github-accent cursor-pointer transition-colors" title={item.commit.message}>{item.commit.message.split('\n')[0]}</p>
-                                         <div className="flex flex-wrap items-center gap-2 mt-1.5 text-xs text-github-muted">
-                                            <span className="font-bold text-github-text">{item.commit.author.name}</span>
-                                            <span className="opacity-50 hidden sm:inline">•</span>
-                                            <span>{timeAgo(item.commit.author.date)}</span>
-                                         </div>
+                                <div key={item.sha} className={`p-4 flex gap-4 group hover:bg-white/5 transition-colors ${idx !== commits.length - 1 ? 'border-b border-github-border' : ''}`}>
+                                   <div className="mt-1 shrink-0"><GitCommit className="w-4 h-4 text-github-muted group-hover:text-github-accent transition-colors" /></div>
+                                   <div className="flex-1 min-w-0">
+                                      <p className="text-sm text-white font-mono truncate hover:text-github-accent cursor-pointer transition-colors" title={item.commit.message}>{item.commit.message.split('\n')[0]}</p>
+                                      <div className="flex items-center gap-2 mt-1.5 text-xs text-github-muted">
+                                         <span className="font-bold text-github-text">{item.commit.author.name}</span>
+                                         <span className="opacity-50">•</span>
+                                         <span>{timeAgo(item.commit.author.date)}</span>
                                       </div>
                                    </div>
-                                   <div className="flex items-center justify-between sm:justify-end sm:flex-col sm:items-end gap-2 shrink-0">
+                                   <div className="flex flex-col items-end justify-center shrink-0">
                                       <a href={item.html_url} target="_blank" rel="noreferrer" className="text-[10px] font-mono text-github-muted hover:text-white bg-white/5 px-2 py-1 rounded border border-white/5 transition-colors hover:border-github-accent/50">{item.sha.substring(0,7)}</a>
                                    </div>
                                 </div>
@@ -683,7 +628,7 @@ export default function App() {
                      )}
                   </div>
                   
-                  {/* TOC Sidebar (Hidden on mobile) */}
+                  {/* TOC Sidebar */}
                   {activeTab === 'readme' && !contentError && toc.length > 0 && !contentLoading && (
                     <div className="hidden xl:block w-72 flex-shrink-0 animate-fade-in" style={{ animationDelay: '0.2s' }}>
                        <div className="sticky top-24">
@@ -715,9 +660,10 @@ export default function App() {
              )}
            </div>
         </div>
+      </main>
 
-        {/* Modal (Paramètres) */}
-        <Modal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)}>
+      {/* Settings Modal */}
+      <Modal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)}>
          <div className="flex justify-between items-center mb-6 relative z-10">
             <h3 className="text-lg font-bold text-white flex items-center gap-2"><Shield className="w-5 h-5 text-github-accent" /> Configuration</h3>
             <button onClick={() => setIsSettingsOpen(false)} className="text-github-muted hover:text-white p-1 rounded hover:bg-white/10 transition-colors active:scale-95"><X className="w-5 h-5" /></button>
@@ -749,10 +695,10 @@ export default function App() {
                localStorage.setItem('botxlab_org', config.org);
                setIsSettingsOpen(false);
                setRepos([]); 
+               // Trigger effect via dependency on config
             }} className="bg-github-accent hover:bg-blue-500 text-white px-5 py-2 rounded-lg font-medium text-sm transition-all shadow-lg shadow-blue-500/20 active:scale-95 active:transform">Save Changes</button>
          </div>
-        </Modal>
-      </main>
+      </Modal>
     </div>
   );
 }
