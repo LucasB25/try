@@ -100,7 +100,7 @@
         .markdown-body code { 
             background-color: rgba(110,118,129,0.15); padding: 0.2em 0.4em; 
             border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 0.9em; color: #e6edf3;
-            word-wrap: break-word; /* Ensure inline code breaks if needed */
+            word-wrap: break-word;
         }
         .markdown-body pre code { background-color: transparent; padding: 0; color: inherit; word-wrap: normal; }
         
@@ -212,9 +212,6 @@
         <!-- Sidebar Footer -->
         <div class="p-4 border-t border-github-border flex justify-between items-center bg-[#010409] flex-shrink-0">
             <div class="flex items-center gap-3">
-                <button onclick="openSettings()" class="text-github-muted hover:text-white transition-colors p-1.5 hover:bg-github-border rounded-md" title="API Settings">
-                    <i data-lucide="settings" class="w-4 h-4"></i>
-                </button>
                 <span class="flex items-center gap-2 text-[10px] text-github-muted font-mono uppercase tracking-wide opacity-70">
                     <span id="auto-sync-status" class="w-1.5 h-1.5 rounded-full bg-github-muted"></span>
                     <span id="last-sync-time" class="hidden sm:inline">Just now</span>
@@ -400,65 +397,28 @@
         </div>
     </main>
 
-    <!-- Settings Modal -->
-    <div id="settings-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] hidden flex items-center justify-center p-4">
-        <div class="bg-[#161b22] border border-github-border rounded-xl shadow-2xl w-full max-w-md p-6 transform transition-all scale-100 relative overflow-hidden">
-            <!-- Decorative blur -->
-            <div class="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
-            
-            <div class="flex justify-between items-center mb-6 relative z-10">
-                <h3 class="text-lg font-bold text-white flex items-center gap-2">
-                    <i data-lucide="shield" class="w-5 h-5 text-github-accent"></i>
-                    Configuration
-                </h3>
-                <button onclick="closeSettings()" class="text-github-muted hover:text-white transition-colors"><i data-lucide="x" class="w-5 h-5"></i></button>
-            </div>
-            
-            <div class="space-y-5 relative z-10">
-                <!-- Org Setting -->
-                <div>
-                    <label class="block text-sm font-medium text-github-muted mb-2">GitHub User or Organization</label>
-                    <div class="relative">
-                        <i data-lucide="user" class="absolute left-3 top-2.5 w-4 h-4 text-github-muted"></i>
-                        <input type="text" id="api-org-input" placeholder="e.g. facebook, google, botxlab" class="w-full bg-[#0d1117] border border-github-border rounded-lg py-2 pl-10 pr-3 text-white focus:border-github-accent focus:outline-none focus:ring-1 focus:ring-github-accent transition-all text-sm font-mono shadow-inner">
-                    </div>
-                </div>
-
-                <!-- Token Setting -->
-                <div>
-                    <label class="block text-sm font-medium text-github-muted mb-2">GitHub Personal Access Token</label>
-                    <div class="relative">
-                        <i data-lucide="key" class="absolute left-3 top-2.5 w-4 h-4 text-github-muted"></i>
-                        <input type="password" id="api-token-input" placeholder="ghp_xxxxxxxxxxxx" class="w-full bg-[#0d1117] border border-github-border rounded-lg py-2 pl-10 pr-3 text-white focus:border-github-accent focus:outline-none focus:ring-1 focus:ring-github-accent transition-all text-sm font-mono shadow-inner">
-                    </div>
-                </div>
-                
-                <div class="bg-blue-900/10 border border-blue-500/20 p-4 rounded-lg text-xs text-blue-200 leading-relaxed flex gap-3">
-                    <i data-lucide="info" class="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5"></i>
-                    <div>
-                        <strong>Why is this needed?</strong><br>
-                        Without a token, GitHub limits you to 60 requests/hour. Adding a token increases this limit to 5000/hour. Data is stored locally in your browser.
-                    </div>
-                </div>
-            </div>
-
-            <div class="mt-8 flex justify-end gap-3 relative z-10">
-                <button onclick="closeSettings()" class="text-sm font-medium text-github-muted hover:text-white px-4 py-2 transition-colors rounded-lg hover:bg-white/5">Cancel</button>
-                <button onclick="saveSettings()" class="bg-github-accent hover:bg-blue-500 text-white px-5 py-2 rounded-lg font-medium text-sm transition-all shadow-lg shadow-blue-500/20 active:transform active:scale-95">
-                    Save Changes
-                </button>
-            </div>
-        </div>
-    </div>
-
     <script>
-        // --- Configuration & State ---
+        // ==========================================
+        // CONFIGURATION - HARDCODED CREDENTIALS
+        // ==========================================
+        const GITHUB_CONFIG = {
+            // ENTER YOUR ORGANIZATION OR USERNAME HERE
+            ORG: "botxlab", 
+            
+            // ENTER YOUR PERSONAL ACCESS TOKEN HERE (ghp_xxxx...)
+            // Required to avoid low rate limits (60/hr).
+            // With token: 5000/hr.
+            TOKEN: "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" 
+        };
+        // ==========================================
+
+        // --- State ---
         const state = {
-            repos: JSON.parse(localStorage.getItem('botxlab_cache_v6')) || [],
-            token: localStorage.getItem('botxlab_token') || '',
-            org: localStorage.getItem('botxlab_org') || 'botxlab', 
+            repos: JSON.parse(localStorage.getItem('botxlab_cache_v7')) || [],
+            token: GITHUB_CONFIG.TOKEN,
+            org: GITHUB_CONFIG.ORG, 
             currentRepo: null,
-            lastSync: parseInt(localStorage.getItem('botxlab_last_sync_v6')) || 0,
+            lastSync: parseInt(localStorage.getItem('botxlab_last_sync_v7')) || 0,
             activeTab: 'readme'
         };
 
@@ -473,11 +433,6 @@
             // Layout
             sidebar: document.getElementById('sidebar'),
             mobileOverlay: document.getElementById('mobile-overlay'),
-            
-            // Settings
-            settingsModal: document.getElementById('settings-modal'),
-            tokenInput: document.getElementById('api-token-input'),
-            orgInput: document.getElementById('api-org-input'),
             
             // Header
             headerTitle: document.getElementById('header-title'),
@@ -547,9 +502,7 @@
                 }
             }
             if (e.key === 'Escape') {
-                if (!els.settingsModal.classList.contains('hidden')) {
-                    closeSettings();
-                } else if (document.activeElement === els.searchInput) {
+                if (document.activeElement === els.searchInput) {
                     els.searchInput.blur();
                 } else if (!els.mobileOverlay.classList.contains('hidden')) {
                     toggleMobileSidebar();
@@ -655,16 +608,13 @@
             lucide.createIcons();
             els.searchInput.addEventListener('input', (e) => renderSidebar(e.target.value));
             
-            // Init Settings fields
-            els.tokenInput.value = state.token;
-            els.orgInput.value = state.org;
-
             if (state.repos.length > 0) {
                 updateStats();
                 renderSidebar();
                 renderDashboard();
             }
 
+            // Sync if empty or old
             if (state.repos.length === 0 || (Date.now() - state.lastSync > 900000)) {
                 await autoDiscoverRepos();
             }
@@ -677,27 +627,6 @@
                 headers['Authorization'] = `Bearer ${state.token}`;
             }
             return headers;
-        }
-
-        // --- Settings UI ---
-        function openSettings() { els.settingsModal.classList.remove('hidden'); }
-        function closeSettings() { els.settingsModal.classList.add('hidden'); }
-        
-        function saveSettings() {
-            state.token = els.tokenInput.value.trim();
-            state.org = els.orgInput.value.trim() || 'botxlab';
-            
-            localStorage.setItem('botxlab_token', state.token);
-            localStorage.setItem('botxlab_org', state.org);
-            
-            closeSettings();
-            
-            // Clear cache and reload for new org
-            state.repos = [];
-            state.lastSync = 0;
-            localStorage.removeItem('botxlab_cache_v6');
-            
-            autoDiscoverRepos(true); 
         }
 
         // --- Data Fetching ---
@@ -713,13 +642,14 @@
                 let url = `https://api.github.com/orgs/${state.org}/repos?sort=updated&per_page=100&type=all`;
                 let response = await fetch(url, { headers: getHeaders() });
                 
+                // Fallback to user if Org fails
                 if (response.status === 404) {
                      url = `https://api.github.com/users/${state.org}/repos?sort=updated&per_page=100&type=all`;
                      response = await fetch(url, { headers: getHeaders() });
                 }
 
                 if (!response.ok) {
-                    if (response.status === 403) throw new Error("Rate Limit Exceeded. Add Token.");
+                    if (response.status === 403) throw new Error("Rate Limit Exceeded. Check your Token in HTML.");
                     if (response.status === 404) throw new Error(`User/Org '${state.org}' not found`);
                     throw new Error(`API Error: ${response.status}`);
                 }
@@ -749,8 +679,8 @@
                 state.repos = processedRepos;
                 state.lastSync = Date.now();
                 
-                localStorage.setItem('botxlab_cache_v6', JSON.stringify(state.repos));
-                localStorage.setItem('botxlab_last_sync_v6', state.lastSync);
+                localStorage.setItem('botxlab_cache_v7', JSON.stringify(state.repos));
+                localStorage.setItem('botxlab_last_sync_v7', state.lastSync);
 
                 updateStats();
                 renderSidebar();
