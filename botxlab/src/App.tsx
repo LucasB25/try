@@ -7,7 +7,8 @@ import {
   Box, Search, Settings, RefreshCw, X, Menu, LayoutGrid, 
   BookOpen, Tag, GitCommit, Users, FolderGit2, Star, Code2, 
   Sparkles, Book, Globe, CircleDot,
-  FileWarning, ExternalLink, GitMerge, Shield, Key, User, Info, Check, Calendar, List, Clock
+  FileWarning, ExternalLink, GitMerge, Shield, Key, User, Info, Check, Calendar, List, Clock,
+  MoreHorizontal 
 } from 'lucide-react';
 
 // --- 1. Interfaces (Typage Strict) ---
@@ -137,6 +138,7 @@ export default function App() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isTabMenuOpen, setIsTabMenuOpen] = useState(false);
   
   // Loading & Async Data States
   const [reposLoading, setReposLoading] = useState(false);
@@ -247,13 +249,10 @@ export default function App() {
   // --- Optimized TOC Generation ---
   useEffect(() => {
     if (activeTab === 'readme' && readmeContent) {
-      // Use a simpler approach: extract headers from markdown text first (regex) 
-      // OR parse the DOM after render. Using DOM is easier with react-markdown.
-      // We wrap in requestAnimationFrame to ensure DOM is ready.
       requestAnimationFrame(() => {
         const headings = document.querySelectorAll('.markdown-body h1, .markdown-body h2, .markdown-body h3');
         const newToc: TocItem[] = Array.from(headings).map((h, i) => ({
-          id: h.id || `heading-${i}`, // rehype-slug adds IDs, fallback used just in case
+          id: h.id || `heading-${i}`,
           text: h.textContent || '',
           level: parseInt(h.tagName.substring(1))
         }));
@@ -287,7 +286,7 @@ export default function App() {
     setView('project');
     setActiveTab('readme');
     setIsSidebarOpen(false);
-    setSearchTerm(''); // Clear search on open for better UX
+    setSearchTerm('');
   };
 
   const copyCloneCmd = () => {
@@ -298,7 +297,6 @@ export default function App() {
   }
 
   // --- Render Helpers ---
-  // Markdown Image & Link Fixer
   const markdownComponents = {
     img: ({node, ...props}: any) => {
       let url = props.src || '';
@@ -319,6 +317,13 @@ export default function App() {
       return <a {...props} href={url} className="text-github-accent hover:underline" target="_blank" rel="noopener noreferrer" />;
     }
   };
+
+  const tabsConfig = [
+    { id: 'readme', icon: BookOpen, label: 'README' },
+    { id: 'releases', icon: Tag, label: 'Releases' },
+    { id: 'commits', icon: GitCommit, label: 'Commits' },
+    { id: 'collaborators', icon: Users, label: 'Collaborators' },
+  ];
 
   return (
     <div className="h-screen flex overflow-hidden font-sans text-sm bg-github-bg text-github-text selection:bg-github-accent selection:text-white">
@@ -394,7 +399,8 @@ export default function App() {
       {/* Main Content */}
       <main className="flex-1 flex flex-col h-full relative overflow-hidden bg-github-bg">
         <header className="h-14 md:h-16 border-b border-github-border bg-[#0d1117]/90 backdrop-blur-md flex items-center justify-between px-3 md:px-8 sticky top-0 z-20 shrink-0 shadow-sm transition-all">
-          <div className="flex items-center gap-2 md:gap-6 overflow-hidden w-full h-full">
+          {/* Correction ici : suppression de overflow-hidden pour permettre au dropdown mobile de dépasser */}
+          <div className="flex items-center gap-2 md:gap-6 w-full h-full">
             <button onClick={() => setIsSidebarOpen(true)} className="md:hidden text-github-muted hover:text-white p-1 active:scale-95"><Menu className="w-5 h-5" /></button>
             
             {view === 'project' && (
@@ -417,24 +423,60 @@ export default function App() {
             </div>
 
             {view === 'project' && (
-              <div className="hidden md:flex items-center gap-6 ml-auto h-full min-w-0 overflow-x-auto hide-scrollbar pl-2 mask-linear">
-                 {[
-                   { id: 'readme', icon: BookOpen, label: 'README' },
-                   { id: 'releases', icon: Tag, label: 'Releases' },
-                   { id: 'commits', icon: GitCommit, label: 'Commits' },
-                   { id: 'collaborators', icon: Users, label: 'Collaborators' },
-                 ].map(tab => (
-                   <button 
-                     key={tab.id}
-                     onClick={() => setActiveTab(tab.id as TabState)}
-                     className={`relative h-full flex items-center gap-2 text-sm font-medium px-1 transition-colors hover:text-white ${activeTab === tab.id ? 'text-white' : 'text-github-muted'}`}
-                   >
-                     <tab.icon className={`w-4 h-4 transition-opacity ${activeTab === tab.id ? 'opacity-100' : 'opacity-70'}`} />
-                     <span className="hidden lg:inline">{tab.label}</span>
-                     {activeTab === tab.id && <span className="absolute bottom-0 left-0 w-full h-[2px] bg-github-accent shadow-[0_-2px_6px_rgba(88,166,255,0.6)] animate-fade-in"></span>}
-                   </button>
-                 ))}
-              </div>
+              <>
+                {/* Desktop Tabs View */}
+                <div className="hidden md:flex items-center gap-6 ml-auto h-full min-w-0 overflow-x-auto hide-scrollbar pl-2 mask-linear">
+                  {tabsConfig.map(tab => (
+                    <button 
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id as TabState)}
+                      className={`relative h-full flex items-center gap-2 text-sm font-medium px-1 transition-colors hover:text-white ${activeTab === tab.id ? 'text-white' : 'text-github-muted'}`}
+                    >
+                      <tab.icon className={`w-4 h-4 transition-opacity ${activeTab === tab.id ? 'opacity-100' : 'opacity-70'}`} />
+                      <span className="hidden lg:inline">{tab.label}</span>
+                      {activeTab === tab.id && <span className="absolute bottom-0 left-0 w-full h-[2px] bg-github-accent shadow-[0_-2px_6px_rgba(88,166,255,0.6)] animate-fade-in"></span>}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Mobile Tabs Burger Menu */}
+                <div className="md:hidden ml-auto relative">
+                    <button 
+                      onClick={() => setIsTabMenuOpen(!isTabMenuOpen)}
+                      className={`p-2 rounded-lg transition-colors ${isTabMenuOpen ? 'text-white bg-white/10' : 'text-github-muted hover:text-white'}`}
+                    >
+                      <MoreHorizontal className="w-5 h-5" />
+                    </button>
+
+                    {/* Mobile Dropdown */}
+                    {isTabMenuOpen && (
+                      <>
+                        <div className="fixed inset-0 z-40 bg-transparent" onClick={() => setIsTabMenuOpen(false)} />
+                        <div className="absolute top-full right-0 mt-2 w-48 bg-[#161b22] border border-github-border rounded-xl shadow-2xl z-50 overflow-hidden animate-slide-up origin-top-right">
+                          <div className="py-1">
+                            {tabsConfig.map(tab => (
+                              <button 
+                                key={tab.id}
+                                onClick={() => {
+                                  setActiveTab(tab.id as TabState);
+                                  setIsTabMenuOpen(false);
+                                }}
+                                className={`w-full text-left px-4 py-3 text-sm font-medium flex items-center gap-3 transition-colors ${
+                                  activeTab === tab.id 
+                                    ? 'bg-github-accent/10 text-github-accent border-l-2 border-github-accent' 
+                                    : 'text-github-text hover:bg-white/5 border-l-2 border-transparent'
+                                }`}
+                              >
+                                <tab.icon className="w-4 h-4" />
+                                {tab.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                </div>
+              </>
             )}
             
             {view === 'project' && currentRepo && (
