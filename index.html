@@ -8,10 +8,9 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
-    <!-- Tesseract.js pour l'OCR (Lecture de texte sur image) -->
+    <!-- Tesseract.js pour l'OCR (Réseaux de neurones LSTM) -->
     <script src='https://unpkg.com/tesseract.js@v2.1.0/dist/tesseract.min.js'></script>
     <style>
-        /* Animation pour le flash message */
         @keyframes bounce-in {
             0% { transform: translate(-50%, -20px); opacity: 0; }
             50% { transform: translate(-50%, 5px); }
@@ -20,19 +19,25 @@
         .animate-bounce-in {
             animation: bounce-in 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
         }
-        /* Cacher la scrollbar mais garder le scroll */
-        .no-scrollbar::-webkit-scrollbar {
-            display: none;
-        }
-        .no-scrollbar {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
-        }
-        /* Style pour la vidéo */
-        #camera-feed {
-            object-fit: cover;
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        #camera-feed { object-fit: cover; width: 100%; height: 100%; }
+        /* Effet de scan "Matrix" pour l'IA */
+        .scan-line {
+            position: absolute;
+            top: 0;
+            left: 0;
             width: 100%;
-            height: 100%;
+            height: 4px;
+            background: rgba(99, 102, 241, 0.8);
+            box-shadow: 0 0 10px rgba(99, 102, 241, 0.8);
+            animation: scan 2s linear infinite;
+        }
+        @keyframes scan {
+            0% { top: 0%; opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { top: 100%; opacity: 0; }
         }
     </style>
 </head>
@@ -48,20 +53,20 @@
         const state = {
             items: [],
             budget: 50,
-            view: 'list', // 'list', 'scan', 'manual'
+            view: 'list', 
             scanning: false,
-            analyzing: false, // Nouvel état pour l'analyse OCR en cours
+            analyzing: false,
+            analysisStep: '', // Pour afficher ce que l'IA fait (ex: "Filtre Négatif...")
             cameraActive: false, 
             manualName: '',
             manualPrice: '',
             flashMessage: null
         };
 
-        let videoStream = null; // Variable pour stocker le flux vidéo
+        let videoStream = null;
 
         // --- LOGIQUE MÉTIER ---
 
-        // Calculs
         function getTotals() {
             const total = state.items.reduce((acc, item) => acc + (item.price * item.qty), 0);
             const remaining = state.budget - total;
@@ -69,27 +74,15 @@
             return { total, remaining, progress };
         }
 
-        // Actions
         function setView(viewName) {
-            // Si on quitte le mode scan, on coupe la caméra
-            if (state.view === 'scan' && viewName !== 'scan') {
-                stopCamera();
-            }
-
+            if (state.view === 'scan' && viewName !== 'scan') stopCamera();
             state.view = viewName;
-            
-            // Reset des champs manuels si on quitte vers la liste
             if (viewName === 'list') {
                 state.manualName = '';
                 state.manualPrice = '';
             }
-
-            // Si on va vers le scan, on lance la caméra
-            if (viewName === 'scan') {
-                startCamera();
-            } else {
-                render();
-            }
+            if (viewName === 'scan') startCamera();
+            else render();
         }
 
         function setBudget(value) {
@@ -97,10 +90,11 @@
             render();
         }
 
-        // --- GESTION CAMÉRA & OCR ---
+        // --- GESTION CAMÉRA & IA (MULTI-PASS) ---
         async function startCamera() {
             state.scanning = true;
             state.analyzing = false;
+            state.analysisStep = '';
             render(); 
 
             try {
@@ -110,14 +104,17 @@
                 videoStream = stream;
                 state.cameraActive = true;
                 
-                const videoElement = document.getElementById('camera-feed');
-                if (videoElement) {
-                    videoElement.srcObject = stream;
-                    videoElement.play();
-                }
+                // Petit délai pour laisser la caméra s'initialiser
+                setTimeout(() => {
+                    const videoElement = document.getElementById('camera-feed');
+                    if (videoElement) {
+                        videoElement.srcObject = stream;
+                        videoElement.play();
+                    }
+                }, 100);
             } catch (err) {
-                console.error("Erreur accès caméra:", err);
-                alert("Impossible d'accéder à la caméra. Vérifiez vos permissions ou utilisez HTTPS.");
+                console.error("Erreur caméra:", err);
+                alert("Erreur caméra. Vérifiez permissions/HTTPS.");
                 state.scanning = false;
                 setView('list');
             }
@@ -131,30 +128,31 @@
             state.cameraActive = false;
         }
 
-        // Fonction utilitaire pour améliorer l'image avant OCR
-        // Convertit en niveaux de gris et augmente le contraste (Binarisation simple)
-        function preprocessImage(ctx, width, height) {
+        // --- FILTRES D'IMAGE IA ---
+        function applyImageFilter(ctx, width, height, filterType) {
             const imageData = ctx.getImageData(0, 0, width, height);
             const data = imageData.data;
-            
-            // Seuil pour le noir et blanc (0-255). 
-            // 128 est standard, on peut ajuster si l'image est trop claire/foncée.
-            const threshold = 100; 
+            const threshold = 110; 
 
             for (let i = 0; i < data.length; i += 4) {
-                // Formule de luminosité standard
                 const avg = (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114);
-                
-                // Binarisation : Si c'est sombre -> Noir total, sinon Blanc total
-                // Cela aide énormément l'OCR à voir les formes nettes
-                const value = avg < threshold ? 0 : 255;
-                
+                let value = avg;
+
+                if (filterType === 'binary') {
+                    // Contraste Extrême (Noir & Blanc)
+                    value = avg < threshold ? 0 : 255;
+                } else if (filterType === 'inverted') {
+                    // Négatif (Utile pour étiquettes électroniques fond noir)
+                    value = avg < threshold ? 255 : 0;
+                } else if (filterType === 'grayscale') {
+                    // Juste niveaux de gris
+                    value = avg; 
+                }
+
                 data[i] = value;     // R
                 data[i + 1] = value; // G
                 data[i + 2] = value; // B
-                // Alpha reste inchangé
             }
-            
             ctx.putImageData(imageData, 0, 0);
         }
 
@@ -162,80 +160,86 @@
             const video = document.getElementById('camera-feed');
             if (!video || !videoStream) return;
 
-            // 1. Passage en mode Analyse (UI Loading)
             state.analyzing = true;
-            render(); // Met à jour l'UI pour montrer le spinner
+            render();
 
-            // 2. Capture de l'image dans un canvas invisible
             const canvas = document.createElement('canvas');
-            // On capture en résolution native de la vidéo pour plus de précision
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             const ctx = canvas.getContext('2d');
             
-            // Dessiner l'image brute
+            // On capture l'image de base
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
             
-            // --- NOUVEAU : Prétraitement de l'image (Noir & Blanc) ---
-            // Cela aide l'OCR à ne pas être distrait par les couleurs ou ombres
-            preprocessImage(ctx, canvas.width, canvas.height);
+            // --- STRATÉGIE IA MULTI-PASS ---
+            // On va essayer 3 méthodes jusqu'à trouver un prix
+            const strategies = ['binary', 'inverted', 'grayscale'];
+            let foundPrice = null;
 
-            // 3. Traitement OCR avec Tesseract.js
-            try {
-                const result = await Tesseract.recognize(
-                    canvas,
-                    'eng', // 'eng' est souvent mieux entraîné pour les chiffres que 'fra'
-                    { 
-                        // --- NOUVEAU : Paramètres pour forcer la détection de chiffres ---
-                        tessedit_char_whitelist: '0123456789.,€', // On n'accepte QUE ces caractères
-                        tessedit_pageseg_mode: '6', // Mode bloc de texte uniforme (aide parfois pour les étiquettes)
+            for (let strategy of strategies) {
+                if (foundPrice) break; // Si trouvé, on arrête
+
+                // Feedback UI
+                state.analysisStep = `Analyse neurale : Filtre ${strategy === 'binary' ? 'Contraste' : (strategy === 'inverted' ? 'Négatif' : 'Standard')}...`;
+                render();
+
+                // 1. Appliquer le filtre sur une copie du contexte ou re-dessiner
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height); // Reset image
+                applyImageFilter(ctx, canvas.width, canvas.height, strategy);
+
+                // 2. Reconnaissance Tesseract
+                try {
+                    const result = await Tesseract.recognize(canvas, 'eng', { 
+                        tessedit_char_whitelist: '0123456789.,€', 
+                        tessedit_pageseg_mode: '6'
+                    });
+
+                    const text = result.data.text;
+                    console.log(`[IA ${strategy}] Texte brut :`, text);
+
+                    // 3. Regex intelligente (Tolérance aux erreurs OCR courantes)
+                    // Cherche formats: 12.99, 12,99, 12€99, 12. 99, 12 99
+                    // Explication Regex:
+                    // \d{1,4} : 1 à 4 chiffres (partie entière)
+                    // \s?[.,€ ]\s? : séparateur (point, virgule, euro, espace) avec espaces optionnels
+                    // \d{2} : exactement 2 chiffres (centimes)
+                    const priceMatches = text.match(/(\d{1,4}\s?[.,€]\s?\d{2})/g);
+
+                    if (priceMatches && priceMatches.length > 0) {
+                        // Nettoyage du résultat
+                        let raw = priceMatches[0];
+                        // Remplace virgule, euro ou espace par un point
+                        let clean = raw.replace(/[€,\s]/g, '.');
+                        // Fix si double points (12..99)
+                        clean = clean.replace(/\.{2,}/g, '.');
+                        
+                        if (!isNaN(parseFloat(clean))) {
+                            foundPrice = clean;
+                        }
                     }
-                );
-
-                const text = result.data.text;
-                console.log("Texte brut OCR :", text);
-
-                // 4. Extraction du prix via Regex améliorée
-                // Cherche: Chiffres + (. ou ,) + 1 ou 2 chiffres
-                // Exemples acceptés: "12.99", "5,50", "3.5"
-                const priceRegex = /(\d+[.,]\d{1,2})/g; 
-                const matches = text.match(priceRegex);
-
-                state.scanning = false;
-                state.analyzing = false;
-                stopCamera();
-
-                if (matches && matches.length > 0) {
-                    // Nettoyage : remplace virgule par point pour le parsing JS
-                    let bestMatch = matches[0].replace(',', '.');
-                    
-                    // Si on a plusieurs matchs, on essaie de prendre celui qui ressemble le plus à un prix réaliste
-                    // (Ici on prend juste le premier pour simplifier)
-                    
-                    state.manualPrice = bestMatch;
-                    state.manualName = '';
-                    state.view = 'manual';
-                    showFlash(`Prix lu : ${bestMatch} €`);
-                } else {
-                    // Échec de lecture
-                    state.manualPrice = '';
-                    state.manualName = '';
-                    state.view = 'manual';
-                    showFlash("Aucun prix clair détecté. Réessayez.");
+                } catch (e) {
+                    console.warn("Erreur passe IA:", e);
                 }
-
-            } catch (err) {
-                console.error(err);
-                state.scanning = false;
-                state.analyzing = false;
-                stopCamera();
-                state.view = 'manual';
-                showFlash("Erreur technique OCR.");
             }
-            
+
+            state.scanning = false;
+            state.analyzing = false;
+            stopCamera();
+
+            if (foundPrice) {
+                state.manualPrice = foundPrice;
+                state.manualName = '';
+                state.view = 'manual';
+                showFlash(`🎯 Prix identifié : ${foundPrice} €`);
+            } else {
+                state.manualPrice = '';
+                state.view = 'manual';
+                showFlash("⚠️ Échec IA. Essayez de vous rapprocher.");
+            }
             render();
         }
 
+        // --- FONCTIONS STANDARD ---
         function addItem(name, price) {
             const finalName = name.trim() || "Article sans nom";
             const existingItem = state.items.find(i => i.name === finalName && i.price === price);
@@ -243,12 +247,7 @@
             if (existingItem) {
                 existingItem.qty += 1;
             } else {
-                state.items.push({ 
-                    id: Date.now(), 
-                    name: finalName, 
-                    price: parseFloat(price), 
-                    qty: 1 
-                });
+                state.items.push({ id: Date.now(), name: finalName, price: parseFloat(price), qty: 1 });
             }
         }
 
@@ -283,13 +282,16 @@
         function showFlash(msg) {
             state.flashMessage = msg;
             render();
-            setTimeout(() => {
-                state.flashMessage = null;
-                render();
-            }, 3000);
+            setTimeout(() => { state.flashMessage = null; render(); }, 3000);
         }
 
-        // --- RENDU (TEMPLATES HTML) ---
+        function goToManual() {
+            state.manualPrice = '';
+            state.manualName = '';
+            setView('manual');
+        }
+
+        // --- RENDU HTML ---
 
         function ShoppingBagIcon() {
             return `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>`;
@@ -318,41 +320,32 @@
             const remainingTextClass = remaining < 0 ? 'text-red-600 font-bold' : 'text-slate-400';
             const remainingText = remaining < 0 ? `Dépassement de ${Math.abs(remaining).toFixed(2)} €` : `Reste ${remaining.toFixed(2)} €`;
 
-            let itemsHtml = '';
-            if (state.items.length === 0) {
-                itemsHtml = `
+            let itemsHtml = state.items.length === 0 ? `
                 <div class="text-center py-12 px-4">
                     <div class="bg-indigo-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
                         <i data-lucide="shopping-cart" class="text-indigo-400 w-10 h-10"></i>
                     </div>
                     <h3 class="text-lg font-medium text-slate-700">Votre panier est vide</h3>
                     <p class="text-slate-500 text-sm mt-1">Scannez une étiquette de prix ou ajoutez un article.</p>
-                </div>`;
-            } else {
-                itemsHtml = `<div class="space-y-3 pb-24">` + state.items.map(item => `
+                </div>` : 
+                `<div class="space-y-3 pb-24">` + state.items.map(item => `
                     <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between">
                         <div class="flex-1">
                             <h4 class="font-medium text-slate-800">${item.name}</h4>
                             <p class="text-indigo-600 font-bold text-sm">${(item.price * item.qty).toFixed(2)} € <span class="text-slate-400 font-normal text-xs">(${item.price.toFixed(2)} €/u)</span></p>
                         </div>
-                        
                         <div class="flex items-center gap-3">
                             <div class="flex items-center bg-slate-50 rounded-lg p-1 border border-slate-200">
-                                <button onclick="updateQty(${item.id}, -1)" class="w-8 h-8 flex items-center justify-center text-slate-500 hover:bg-white rounded shadow-sm transition-all" ${item.qty <= 1 ? 'disabled style="opacity:0.5"' : ''}>-</button>
+                                <button onclick="updateQty(${item.id}, -1)" class="w-8 h-8 flex items-center justify-center text-slate-500 hover:bg-white" ${item.qty <= 1 ? 'disabled' : ''}>-</button>
                                 <span class="w-8 text-center font-medium text-slate-700">${item.qty}</span>
-                                <button onclick="updateQty(${item.id}, 1)" class="w-8 h-8 flex items-center justify-center text-slate-500 hover:bg-white rounded shadow-sm transition-all">+</button>
+                                <button onclick="updateQty(${item.id}, 1)" class="w-8 h-8 flex items-center justify-center text-slate-500 hover:bg-white">+</button>
                             </div>
-                            <button onclick="removeItem(${item.id})" class="w-8 h-8 flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors">
-                                <i data-lucide="trash-2" size="18"></i>
-                            </button>
+                            <button onclick="removeItem(${item.id})" class="w-8 h-8 flex items-center justify-center text-red-400 hover:bg-red-50 rounded-full"><i data-lucide="trash-2" size="18"></i></button>
                         </div>
-                    </div>
-                `).join('') + `</div>`;
-            }
+                    </div>`).join('') + `</div>`;
 
             return `
             <div class="pb-24">
-                <!-- Header Statistique -->
                 <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 mb-4 sticky top-0 z-10">
                     <div class="flex justify-between items-end mb-2">
                         <div>
@@ -367,161 +360,104 @@
                             </div>
                         </div>
                     </div>
-
-                    <!-- Barre de progression -->
                     <div class="h-3 w-full bg-slate-100 rounded-full overflow-hidden">
                         <div class="h-full transition-all duration-500 ${progressColor}" style="width: ${progress}%"></div>
                     </div>
                     <p class="text-xs mt-1 text-right ${remainingTextClass}">${remainingText}</p>
                 </div>
-
                 ${itemsHtml}
             </div>
-
-            <!-- Boutons Flottants -->
             <div class="fixed bottom-6 left-0 right-0 max-w-md mx-auto px-4 flex justify-center gap-4 z-20">
-                <button onclick="goToManual()" class="flex-1 bg-white text-indigo-600 font-bold py-3 px-6 rounded-2xl shadow-lg border border-indigo-100 flex items-center justify-center gap-2 hover:bg-slate-50 transition-colors">
-                    <i data-lucide="calculator" size="20"></i>
-                    Saisie
+                <button onclick="goToManual()" class="flex-1 bg-white text-indigo-600 font-bold py-3 px-6 rounded-2xl shadow-lg border border-indigo-100 flex items-center justify-center gap-2 hover:bg-slate-50">
+                    <i data-lucide="calculator" size="20"></i> Saisie
                 </button>
-                
-                <button onclick="setView('scan')" class="flex-1 bg-indigo-600 text-white font-bold py-3 px-6 rounded-2xl shadow-lg shadow-indigo-500/40 flex items-center justify-center gap-2 hover:bg-indigo-700 transition-transform active:scale-95">
-                    <i data-lucide="camera" size="20"></i>
-                    Scan Prix
+                <button onclick="setView('scan')" class="flex-1 bg-indigo-600 text-white font-bold py-3 px-6 rounded-2xl shadow-lg shadow-indigo-500/40 flex items-center justify-center gap-2 hover:bg-indigo-700 active:scale-95">
+                    <i data-lucide="brain-circuit" size="20"></i> Scan IA
                 </button>
-            </div>
-            `;
+            </div>`;
         }
 
         function renderScannerView() {
-            // Contenu de la zone caméra
             let overlayContent = '';
 
             if (state.analyzing) {
-                // UI Pendant l'analyse OCR
                 overlayContent = `
-                <div class="absolute inset-0 flex flex-col items-center justify-center bg-black/60 z-50 backdrop-blur-sm">
-                     <div class="w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-                     <p class="text-white font-bold text-lg animate-pulse">Lecture du prix...</p>
-                     <p class="text-slate-300 text-sm mt-2">Traitement image (Nettoyage + OCR)</p>
+                <div class="absolute inset-0 flex flex-col items-center justify-center bg-black/80 z-50 backdrop-blur-sm">
+                     <div class="relative w-20 h-20 mb-6">
+                        <div class="absolute inset-0 rounded-full border-4 border-indigo-900"></div>
+                        <div class="absolute inset-0 rounded-full border-4 border-t-indigo-500 animate-spin"></div>
+                        <i data-lucide="brain" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-white w-8 h-8 animate-pulse"></i>
+                     </div>
+                     <p class="text-white font-bold text-xl animate-pulse">Analyse Neurale</p>
+                     <p class="text-indigo-300 text-sm mt-2 font-mono">${state.analysisStep || 'Initialisation...'}</p>
                 </div>`;
             } else {
-                // UI Viseur standard
                 overlayContent = `
                 <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                     <div class="w-64 h-32 border-2 border-white/50 rounded-lg relative flex items-center justify-center bg-transparent backdrop-blur-[2px]">
+                     <div class="w-64 h-32 border-2 border-indigo-400/50 rounded-lg relative flex items-center justify-center overflow-hidden">
+                        <div class="scan-line"></div>
                         <div class="absolute top-0 left-0 w-4 h-4 border-t-4 border-l-4 border-indigo-500 -mt-1 -ml-1"></div>
                         <div class="absolute top-0 right-0 w-4 h-4 border-t-4 border-r-4 border-indigo-500 -mt-1 -mr-1"></div>
                         <div class="absolute bottom-0 left-0 w-4 h-4 border-b-4 border-l-4 border-indigo-500 -mb-1 -ml-1"></div>
                         <div class="absolute bottom-0 right-0 w-4 h-4 border-b-4 border-r-4 border-indigo-500 -mb-1 -mr-1"></div>
-                        
-                        <span class="text-white/80 font-medium text-sm bg-black/30 px-2 py-1 rounded">Visez le prix bien au centre</span>
+                        <span class="text-white/90 font-bold text-sm bg-black/40 px-3 py-1 rounded backdrop-blur-md border border-white/10 mt-16">VISEZ LE PRIX</span>
                      </div>
                 </div>
-
-                <!-- Bouton de Capture -->
                 <div class="absolute bottom-10 left-0 right-0 flex justify-center z-50 pointer-events-auto">
-                    <button onclick="capturePrice()" class="bg-white rounded-full p-1 shadow-xl active:scale-95 transition-transform">
-                        <div class="w-16 h-16 rounded-full border-4 border-indigo-600 flex items-center justify-center">
-                            <div class="w-12 h-12 bg-indigo-600 rounded-full flex items-center justify-center">
-                                <i data-lucide="aperture" class="text-white w-6 h-6"></i>
-                            </div>
+                    <button onclick="capturePrice()" class="bg-white rounded-full p-2 shadow-xl shadow-indigo-500/20 active:scale-95 transition-transform group">
+                        <div class="w-16 h-16 rounded-full border-4 border-indigo-600 flex items-center justify-center group-hover:bg-indigo-50 transition-colors">
+                            <i data-lucide="scan-eye" class="text-indigo-600 w-8 h-8"></i>
                         </div>
                     </button>
                 </div>`;
             }
 
-            const cameraContent = `
-                <video id="camera-feed" autoplay playsinline muted></video>
-                ${overlayContent}
-            `;
-
             return `
             <div class="fixed inset-0 bg-black z-50 flex flex-col">
                 <div class="flex-1 relative overflow-hidden bg-black">
-                    ${cameraContent}
-                    
-                    ${!state.analyzing ? `
-                    <button onclick="setView('list')" class="absolute top-4 right-4 bg-black/40 text-white p-2 rounded-full hover:bg-black/60 backdrop-blur-sm z-50">
-                        <i data-lucide="x" size="24"></i>
-                    </button>` : ''}
+                    <video id="camera-feed" autoplay playsinline muted></video>
+                    ${overlayContent}
+                    ${!state.analyzing ? `<button onclick="setView('list')" class="absolute top-4 right-4 bg-black/40 text-white p-2 rounded-full hover:bg-black/60 backdrop-blur-sm z-50"><i data-lucide="x" size="24"></i></button>` : ''}
                 </div>
             </div>`;
         }
 
         function renderManualView() {
-            const priceSectionClass = state.manualPrice ? 'bg-indigo-50 p-4 rounded-xl border border-indigo-100' : '';
-            const priceInputClass = "w-full pl-4 pr-8 py-3 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all text-2xl font-bold text-slate-800 bg-white";
-            const btnText = state.manualPrice ? "Valider l'article" : "Ajouter au panier";
-            const title = state.manualPrice ? "Confirmer l'article" : "Ajout Manuel";
-
+            const hasPrice = !!state.manualPrice;
             return `
             <div class="bg-white h-full flex flex-col">
                 <div class="p-4 border-b border-slate-100 flex items-center gap-2">
-                    <button onclick="setView('list')" class="p-2 -ml-2 text-slate-500">
-                        <i data-lucide="chevron-right" class="rotate-180"></i>
-                    </button>
-                    <h2 class="font-bold text-lg text-slate-800">${title}</h2>
+                    <button onclick="setView('list')" class="p-2 -ml-2 text-slate-500"><i data-lucide="chevron-right" class="rotate-180"></i></button>
+                    <h2 class="font-bold text-lg text-slate-800">${hasPrice ? "Confirmer l'article" : "Ajout Manuel"}</h2>
                 </div>
-                
                 <form onsubmit="handleManualSubmit(event)" class="p-6 space-y-6 flex-1">
-                    
-                    <div class="${priceSectionClass}">
+                    <div class="${hasPrice ? 'bg-indigo-50 p-4 rounded-xl border border-indigo-100' : ''}">
                         <label class="block text-sm font-medium text-slate-700 mb-2">Prix Détecté (€)</label>
                         <div class="relative">
-                            <input 
-                                type="number" 
-                                step="0.01"
-                                value="${state.manualPrice}"
-                                oninput="state.manualPrice = this.value; renderManualViewOnly()"
-                                placeholder="0.00"
-                                class="${priceInputClass}"
-                            />
+                            <input type="number" step="0.01" value="${state.manualPrice}" oninput="state.manualPrice = this.value; renderManualViewOnly()" placeholder="0.00" class="w-full pl-4 pr-8 py-3 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none text-2xl font-bold text-slate-800 bg-white" />
                             <span class="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xl">€</span>
                         </div>
-                        ${state.manualPrice ? '<p class="text-xs text-indigo-600 mt-2 font-medium">✨ Prix extrait de l\'image</p>' : ''}
+                        ${hasPrice ? '<p class="text-xs text-indigo-600 mt-2 font-medium flex items-center gap-1"><i data-lucide="sparkles" size="12"></i> Validé par l\'IA</p>' : ''}
                     </div>
-
                     <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-2">Nom du produit (Optionnel)</label>
-                        <input 
-                            type="text" 
-                            value="${state.manualName}"
-                            oninput="state.manualName = this.value"
-                            placeholder="Ex: Fromage, Café..."
-                            class="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all"
-                            ${!state.manualPrice ? 'autofocus' : ''}
-                        />
+                        <label class="block text-sm font-medium text-slate-700 mb-2">Nom du produit</label>
+                        <input type="text" value="${state.manualName}" oninput="state.manualName = this.value" placeholder="Ex: Café..." class="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-2 outline-none" ${!hasPrice ? 'autofocus' : ''} />
                     </div>
-
-                    <button 
-                        type="submit"
-                        ${!state.manualPrice ? 'disabled' : ''}
-                        class="w-full bg-indigo-600 disabled:bg-slate-300 text-white font-bold py-4 rounded-xl shadow-lg shadow-indigo-200 mt-4 flex items-center justify-center gap-2"
-                    >
-                        <i data-lucide="check" size="20"></i>
-                        ${btnText}
+                    <button type="submit" ${!hasPrice && !state.manualPrice ? 'disabled' : ''} class="w-full bg-indigo-600 disabled:bg-slate-300 text-white font-bold py-4 rounded-xl shadow-lg mt-4 flex items-center justify-center gap-2">
+                        <i data-lucide="check" size="20"></i> ${hasPrice || state.manualPrice ? "Valider l'article" : "Ajouter au panier"}
                     </button>
                 </form>
             </div>`;
         }
 
         function renderManualViewOnly() {
-           const btn = document.querySelector('button[type="submit"]');
-           if(btn) {
-               btn.disabled = !state.manualPrice;
-               const span = btn.querySelector('span') || btn; 
-               if (btn.childNodes[2]) btn.childNodes[2].textContent = state.manualPrice ? " Valider l'article" : " Ajouter au panier";
-           }
+            const btn = document.querySelector('button[type="submit"]');
+            if(btn) {
+                btn.disabled = !state.manualPrice;
+                if (btn.childNodes[2]) btn.childNodes[2].textContent = state.manualPrice ? " Valider l'article" : " Ajouter au panier";
+            }
         }
 
-        function goToManual() {
-            state.manualPrice = '';
-            state.manualName = '';
-            setView('manual');
-        }
-
-        // --- MOTEUR DE RENDU PRINCIPAL ---
         function render() {
             const app = document.getElementById('app');
             let mainContent = '';
@@ -531,28 +467,15 @@
             } else {
                 const header = renderHeader();
                 const viewContent = state.view === 'list' ? renderListView() : renderManualView();
-                mainContent = `
-                    ${header}
-                    <main class="flex-1 px-4 -mt-6 relative z-10 overflow-y-auto no-scrollbar h-full">
-                        ${viewContent}
-                    </main>
-                `;
+                mainContent = `${header}<main class="flex-1 px-4 -mt-6 relative z-10 overflow-y-auto no-scrollbar h-full">${viewContent}</main>`;
             }
 
-            // Flash Message
             let flashHtml = '';
             if (state.flashMessage) {
-                flashHtml = `
-                <div class="fixed top-6 left-1/2 -translate-x-1/2 bg-slate-800 text-white px-6 py-3 rounded-full shadow-xl z-[60] flex items-center gap-2 animate-bounce-in whitespace-nowrap">
-                    <i data-lucide="check" class="text-green-400 w-4 h-4"></i>
-                    <span class="text-sm font-medium">${state.flashMessage}</span>
-                </div>`;
+                flashHtml = `<div class="fixed top-6 left-1/2 -translate-x-1/2 bg-slate-800 text-white px-6 py-3 rounded-full shadow-xl z-[60] flex items-center gap-2 animate-bounce-in whitespace-nowrap"><i data-lucide="check" class="text-green-400 w-4 h-4"></i><span class="text-sm font-medium">${state.flashMessage}</span></div>`;
             }
 
-            // Ne pas écraser si la vidéo est déjà active et qu'on est en mode scan
             if (state.view === 'scan' && document.getElementById('camera-feed')) {
-                 // Si on passe en mode "Analysing", il faut re-rendre pour montrer le spinner
-                 // Sinon, on garde la structure actuelle
                  if (state.analyzing && !document.querySelector('.animate-spin')) {
                      // Force re-render pour montrer le loader
                  } else {
@@ -569,7 +492,6 @@
 
             app.innerHTML = mainContent + flashHtml;
             
-            // Si on vient d'afficher la vue scan mais que le stream n'est pas encore attaché
             if (state.view === 'scan' && videoStream) {
                  const videoElement = document.getElementById('camera-feed');
                  if (videoElement && !videoElement.srcObject) {
@@ -577,13 +499,10 @@
                      videoElement.play();
                  }
             }
-            
             lucide.createIcons();
         }
 
-        // Initialisation
         render();
-
     </script>
 </body>
 </html>
