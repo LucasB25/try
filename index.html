@@ -26,6 +26,12 @@
             -ms-overflow-style: none;
             scrollbar-width: none;
         }
+        /* Style pour la vidéo */
+        #camera-feed {
+            object-fit: cover;
+            width: 100%;
+            height: 100%;
+        }
     </style>
 </head>
 <body class="bg-slate-50 min-h-screen font-sans text-slate-800">
@@ -42,10 +48,13 @@
             budget: 50,
             view: 'list', // 'list', 'scan', 'manual'
             scanning: false,
+            cameraActive: false, // Nouvel état pour savoir si la caméra est allumée
             manualName: '',
             manualPrice: '',
             flashMessage: null
         };
+
+        let videoStream = null; // Variable pour stocker le flux vidéo
 
         // --- LOGIQUE MÉTIER ---
 
@@ -59,13 +68,25 @@
 
         // Actions
         function setView(viewName) {
+            // Si on quitte le mode scan, on coupe la caméra
+            if (state.view === 'scan' && viewName !== 'scan') {
+                stopCamera();
+            }
+
             state.view = viewName;
-            // Reset des champs manuels si on quitte vers la liste, sauf si on vient du scan
+            
+            // Reset des champs manuels si on quitte vers la liste
             if (viewName === 'list') {
                 state.manualName = '';
                 state.manualPrice = '';
             }
-            render();
+
+            // Si on va vers le scan, on lance la caméra
+            if (viewName === 'scan') {
+                startCamera();
+            } else {
+                render();
+            }
         }
 
         function setBudget(value) {
@@ -73,22 +94,57 @@
             render();
         }
 
-        function simulateScan() {
+        // --- GESTION CAMÉRA ---
+        async function startCamera() {
             state.scanning = true;
-            render(); // Affiche l'animation de scan
+            render(); // Affiche l'interface de scan (avec la balise vidéo vide)
 
-            setTimeout(() => {
-                // Simulation : Prix aléatoire entre 0.50€ et 15.00€
-                const randomPrice = (Math.random() * 15 + 0.50).toFixed(2);
+            try {
+                // Demande l'accès à la caméra arrière (environment)
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: "environment" } 
+                });
+                videoStream = stream;
+                state.cameraActive = true;
                 
+                // Attacher le flux à l'élément vidéo
+                const videoElement = document.getElementById('camera-feed');
+                if (videoElement) {
+                    videoElement.srcObject = stream;
+                    videoElement.play();
+                }
+            } catch (err) {
+                console.error("Erreur accès caméra:", err);
+                alert("Impossible d'accéder à la caméra. Vérifiez vos permissions ou utilisez un appareil compatible.");
                 state.scanning = false;
-                state.manualPrice = randomPrice;
-                state.manualName = ''; // Reset du nom
-                
-                state.view = 'manual'; // Redirection vers ajout manuel
-                showFlash(`Prix détecté : ${randomPrice} €`);
-                render();
-            }, 1500);
+                setView('list');
+            }
+        }
+
+        function stopCamera() {
+            if (videoStream) {
+                videoStream.getTracks().forEach(track => track.stop());
+                videoStream = null;
+            }
+            state.cameraActive = false;
+        }
+
+        function capturePrice() {
+            // C'est ici qu'on "simule" la lecture du prix sur l'image capturée
+            // Note: Une vraie OCR en JS pur est trop lourde pour ce fichier unique.
+            
+            state.scanning = false; // Arrête l'animation de scan visuelle (si y'en a une)
+            stopCamera(); // Coupe la caméra
+
+            // Simulation : Prix aléatoire "intelligent" (ex: 2.99, 4.50...)
+            const randomPrice = (Math.random() * 15 + 0.50).toFixed(2);
+            
+            state.manualPrice = randomPrice;
+            state.manualName = ''; 
+            
+            state.view = 'manual'; 
+            showFlash(`Prix détecté : ${randomPrice} €`);
+            render();
         }
 
         function addItem(name, price) {
@@ -241,7 +297,7 @@
                 </button>
                 
                 <button onclick="setView('scan')" class="flex-1 bg-indigo-600 text-white font-bold py-3 px-6 rounded-2xl shadow-lg shadow-indigo-500/40 flex items-center justify-center gap-2 hover:bg-indigo-700 transition-transform active:scale-95">
-                    <i data-lucide="scan-line" size="20"></i>
+                    <i data-lucide="camera" size="20"></i>
                     Scan Prix
                 </button>
             </div>
@@ -249,38 +305,38 @@
         }
 
         function renderScannerView() {
-            let content = '';
-            if (!state.scanning) {
-                content = `
-                <div class="text-center px-6">
-                    <div class="relative w-24 h-24 mx-auto mb-6">
-                        <i data-lucide="scan-line" class="w-full h-full text-indigo-400 animate-pulse" width="96" height="96"></i>
-                        <span class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-white font-bold text-xl">€</span>
-                    </div>
-                    <p class="text-white font-bold text-lg mb-2">Scanner un PRIX</p>
-                    <p class="text-slate-400 mb-8 max-w-[200px] mx-auto text-sm">Visez l'étiquette de prix en rayon (pas le code-barres)</p>
-                    
-                    <button onclick="simulateScan()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-4 px-10 rounded-full shadow-lg shadow-indigo-500/30 transition-all transform active:scale-95">
-                        Capturer le Prix
+            // Contenu de la zone caméra
+            const cameraContent = `
+                <video id="camera-feed" autoplay playsinline muted></video>
+                
+                <!-- Overlay Viseur -->
+                <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                     <div class="w-64 h-32 border-2 border-white/50 rounded-lg relative flex items-center justify-center bg-transparent backdrop-blur-[2px]">
+                        <div class="absolute top-0 left-0 w-4 h-4 border-t-4 border-l-4 border-indigo-500 -mt-1 -ml-1"></div>
+                        <div class="absolute top-0 right-0 w-4 h-4 border-t-4 border-r-4 border-indigo-500 -mt-1 -mr-1"></div>
+                        <div class="absolute bottom-0 left-0 w-4 h-4 border-b-4 border-l-4 border-indigo-500 -mb-1 -ml-1"></div>
+                        <div class="absolute bottom-0 right-0 w-4 h-4 border-b-4 border-r-4 border-indigo-500 -mb-1 -mr-1"></div>
+                        
+                        <span class="text-white/80 font-medium text-sm bg-black/30 px-2 py-1 rounded">Visez le prix</span>
+                     </div>
+                </div>
+
+                <!-- Bouton de Capture -->
+                <div class="absolute bottom-10 left-0 right-0 flex justify-center z-50 pointer-events-auto">
+                    <button onclick="capturePrice()" class="bg-white rounded-full p-1 shadow-xl active:scale-95 transition-transform">
+                        <div class="w-16 h-16 rounded-full border-4 border-indigo-600 flex items-center justify-center">
+                            <div class="w-12 h-12 bg-indigo-600 rounded-full"></div>
+                        </div>
                     </button>
-                </div>`;
-            } else {
-                content = `
-                <div class="flex flex-col items-center">
-                    <div class="w-48 h-24 border-2 border-yellow-400 rounded-lg relative flex items-center justify-center bg-yellow-900/10">
-                        <div class="w-full h-0.5 bg-yellow-400 absolute top-1/2 animate-ping"></div>
-                        <span class="text-yellow-400 font-mono text-sm absolute -top-6">Recherche de chiffres...</span>
-                    </div>
-                </div>`;
-            }
+                </div>
+            `;
 
             return `
             <div class="fixed inset-0 bg-black z-50 flex flex-col">
-                <div class="flex-1 relative overflow-hidden">
-                    <div class="absolute inset-0 bg-slate-900 flex items-center justify-center">
-                        ${content}
-                    </div>
-                    <button onclick="setView('list')" class="absolute top-4 right-4 bg-black/40 text-white p-2 rounded-full hover:bg-black/60 backdrop-blur-sm">
+                <div class="flex-1 relative overflow-hidden bg-black">
+                    ${cameraContent}
+                    
+                    <button onclick="setView('list')" class="absolute top-4 right-4 bg-black/40 text-white p-2 rounded-full hover:bg-black/60 backdrop-blur-sm z-50">
                         <i data-lucide="x" size="24"></i>
                     </button>
                 </div>
@@ -317,7 +373,7 @@
                             />
                             <span class="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xl">€</span>
                         </div>
-                        ${state.manualPrice ? '<p class="text-xs text-indigo-600 mt-2 font-medium">✨ Prix capturé par le scanner</p>' : ''}
+                        ${state.manualPrice ? '<p class="text-xs text-indigo-600 mt-2 font-medium">✨ Prix capturé (Simulation)</p>' : ''}
                     </div>
 
                     <div>
@@ -346,15 +402,10 @@
 
         // Fonction spéciale pour update input sans perdre focus (optimisation simple)
         function renderManualViewOnly() {
-           // Dans cette version simple, on ne fait rien pour garder le focus
-           // ou on pourrait réimplémenter une logique de VDOM.
-           // Pour l'instant, on laisse l'input gérer son propre état visuel
-           // et on update juste le bouton si nécessaire.
            const btn = document.querySelector('button[type="submit"]');
            if(btn) {
                btn.disabled = !state.manualPrice;
-               const span = btn.querySelector('span') || btn; // fallback
-               // On update le texte du bouton sommairement
+               const span = btn.querySelector('span') || btn; 
                if (btn.childNodes[2]) btn.childNodes[2].textContent = state.manualPrice ? " Valider l'article" : " Ajouter au panier";
            }
         }
@@ -370,9 +421,6 @@
             const app = document.getElementById('app');
             let mainContent = '';
 
-            // 1. Header (toujours visible sauf si scan plein écran - ici on le garde comme React)
-            // Dans le code React, le header est visible en mode list et manual, mais le Scanner couvre tout.
-            
             if (state.view === 'scan') {
                 mainContent = renderScannerView();
             } else {
@@ -396,9 +444,33 @@
                 </div>`;
             }
 
+            // Important: Ne pas écraser le contenu si on est en mode scan et qu'on a déjà la vidéo
+            // Sinon on perd le flux vidéo à chaque petit changement d'état (ex: flash message)
+            if (state.view === 'scan' && document.getElementById('camera-feed')) {
+                 // On update seulement les overlays si besoin, mais ici simple implementation:
+                 // Pour simplifier, on ne réinjecte pas tout le HTML si la vidéo tourne déjà
+                 // Sauf si on veut afficher le flash message par dessus
+                 const flashContainer = document.getElementById('flash-container');
+                 if (!flashContainer && flashHtml) {
+                     const div = document.createElement('div');
+                     div.id = 'flash-container';
+                     div.innerHTML = flashHtml;
+                     app.appendChild(div.firstChild);
+                 }
+                 return;
+            }
+
             app.innerHTML = mainContent + flashHtml;
             
-            // Initialisation des icônes Lucide après chaque rendu
+            // Si on vient d'afficher la vue scan mais que le stream n'est pas encore attaché
+            if (state.view === 'scan' && videoStream) {
+                 const videoElement = document.getElementById('camera-feed');
+                 if (videoElement && !videoElement.srcObject) {
+                     videoElement.srcObject = videoStream;
+                     videoElement.play();
+                 }
+            }
+            
             lucide.createIcons();
         }
 
