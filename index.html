@@ -8,8 +8,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
-    <!-- Tesseract.js pour l'OCR (Réseaux de neurones LSTM) -->
-    <script src='https://unpkg.com/tesseract.js@v2.1.0/dist/tesseract.min.js'></script>
     <style>
         @keyframes bounce-in {
             0% { transform: translate(-50%, -20px); opacity: 0; }
@@ -22,22 +20,15 @@
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         #camera-feed { object-fit: cover; width: 100%; height: 100%; }
-        /* Effet de scan "Matrix" pour l'IA */
-        .scan-line {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 4px;
-            background: rgba(99, 102, 241, 0.8);
-            box-shadow: 0 0 10px rgba(99, 102, 241, 0.8);
+        
+        /* Effet "Gemini" */
+        .scan-overlay {
+            background: linear-gradient(to bottom, transparent, rgba(99, 102, 241, 0.2), transparent);
             animation: scan 2s linear infinite;
         }
         @keyframes scan {
-            0% { top: 0%; opacity: 0; }
-            10% { opacity: 1; }
-            90% { opacity: 1; }
-            100% { top: 100%; opacity: 0; }
+            0% { transform: translateY(-100%); }
+            100% { transform: translateY(100%); }
         }
     </style>
 </head>
@@ -49,6 +40,9 @@
     </div>
 
     <script>
+        // --- CONFIGURATION API ---
+        const apiKey = "AIzaSyBL_g__glnNzqOVpEQ1XiV4UmD_F2LOPTk"; // La clé est injectée automatiquement par l'environnement d'exécution
+
         // --- ÉTAT GLOBAL (STATE) ---
         const state = {
             items: [],
@@ -56,7 +50,7 @@
             view: 'list', 
             scanning: false,
             analyzing: false,
-            analysisStep: '', // Pour afficher ce que l'IA fait (ex: "Filtre Négatif...")
+            analysisStep: '',
             cameraActive: false, 
             manualName: '',
             manualPrice: '',
@@ -90,7 +84,7 @@
             render();
         }
 
-        // --- GESTION CAMÉRA & IA (MULTI-PASS) ---
+        // --- GESTION CAMÉRA ---
         async function startCamera() {
             state.scanning = true;
             state.analyzing = false;
@@ -98,13 +92,13 @@
             render(); 
 
             try {
+                // Utilisation de la caméra arrière (environment)
                 const stream = await navigator.mediaDevices.getUserMedia({ 
                     video: { facingMode: "environment" } 
                 });
                 videoStream = stream;
                 state.cameraActive = true;
                 
-                // Petit délai pour laisser la caméra s'initialiser
                 setTimeout(() => {
                     const videoElement = document.getElementById('camera-feed');
                     if (videoElement) {
@@ -128,113 +122,80 @@
             state.cameraActive = false;
         }
 
-        // --- FILTRES D'IMAGE IA ---
-        function applyImageFilter(ctx, width, height, filterType) {
-            const imageData = ctx.getImageData(0, 0, width, height);
-            const data = imageData.data;
-            const threshold = 110; 
-
-            for (let i = 0; i < data.length; i += 4) {
-                const avg = (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114);
-                let value = avg;
-
-                if (filterType === 'binary') {
-                    // Contraste Extrême (Noir & Blanc)
-                    value = avg < threshold ? 0 : 255;
-                } else if (filterType === 'inverted') {
-                    // Négatif (Utile pour étiquettes électroniques fond noir)
-                    value = avg < threshold ? 255 : 0;
-                } else if (filterType === 'grayscale') {
-                    // Juste niveaux de gris
-                    value = avg; 
-                }
-
-                data[i] = value;     // R
-                data[i + 1] = value; // G
-                data[i + 2] = value; // B
-            }
-            ctx.putImageData(imageData, 0, 0);
-        }
-
+        // --- INTELLIGENCE ARTIFICIELLE (GEMINI) ---
         async function capturePrice() {
             const video = document.getElementById('camera-feed');
             if (!video || !videoStream) return;
 
+            // 1. UI Loading
             state.analyzing = true;
+            state.analysisStep = "Capture de l'image...";
             render();
 
-            const canvas = document.createElement('canvas');
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            const ctx = canvas.getContext('2d');
-            
-            // On capture l'image de base
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            
-            // --- STRATÉGIE IA MULTI-PASS ---
-            // On va essayer 3 méthodes jusqu'à trouver un prix
-            const strategies = ['binary', 'inverted', 'grayscale'];
-            let foundPrice = null;
+            try {
+                // 2. Capture de l'image
+                const canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                // Conversion en Base64 (JPEG 80% qualité pour optimiser l'envoi)
+                const base64Image = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
 
-            for (let strategy of strategies) {
-                if (foundPrice) break; // Si trouvé, on arrête
-
-                // Feedback UI
-                state.analysisStep = `Analyse neurale : Filtre ${strategy === 'binary' ? 'Contraste' : (strategy === 'inverted' ? 'Négatif' : 'Standard')}...`;
+                state.analysisStep = "Analyse Gemini en cours...";
                 render();
 
-                // 1. Appliquer le filtre sur une copie du contexte ou re-dessiner
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height); // Reset image
-                applyImageFilter(ctx, canvas.width, canvas.height, strategy);
+                // 3. Appel API Gemini
+                const prompt = "Analyse cette image d'étiquette de prix en magasin. Trouve le prix principal du produit. Réponds UNIQUEMENT par le nombre (exemple: 12.99). Ignore les prix au kilo ou autres petits textes. Si tu ne trouves aucun prix clair, réponds '0'.";
 
-                // 2. Reconnaissance Tesseract
-                try {
-                    const result = await Tesseract.recognize(canvas, 'eng', { 
-                        tessedit_char_whitelist: '0123456789.,€', 
-                        tessedit_pageseg_mode: '6'
-                    });
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: [
+                                { text: prompt },
+                                { inlineData: { mimeType: "image/jpeg", data: base64Image } }
+                            ]
+                        }]
+                    })
+                });
 
-                    const text = result.data.text;
-                    console.log(`[IA ${strategy}] Texte brut :`, text);
+                if (!response.ok) throw new Error("Erreur API Gemini");
 
-                    // 3. Regex intelligente (Tolérance aux erreurs OCR courantes)
-                    // Cherche formats: 12.99, 12,99, 12€99, 12. 99, 12 99
-                    // Explication Regex:
-                    // \d{1,4} : 1 à 4 chiffres (partie entière)
-                    // \s?[.,€ ]\s? : séparateur (point, virgule, euro, espace) avec espaces optionnels
-                    // \d{2} : exactement 2 chiffres (centimes)
-                    const priceMatches = text.match(/(\d{1,4}\s?[.,€]\s?\d{2})/g);
+                const data = await response.json();
+                const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+                
+                console.log("Gemini Raw Response:", rawText);
 
-                    if (priceMatches && priceMatches.length > 0) {
-                        // Nettoyage du résultat
-                        let raw = priceMatches[0];
-                        // Remplace virgule, euro ou espace par un point
-                        let clean = raw.replace(/[€,\s]/g, '.');
-                        // Fix si double points (12..99)
-                        clean = clean.replace(/\.{2,}/g, '.');
-                        
-                        if (!isNaN(parseFloat(clean))) {
-                            foundPrice = clean;
-                        }
-                    }
-                } catch (e) {
-                    console.warn("Erreur passe IA:", e);
+                // 4. Nettoyage de la réponse
+                // On cherche un nombre flottant dans la réponse de l'IA
+                const priceMatch = rawText.match(/(\d+[.,]\d{1,2})/);
+                
+                state.scanning = false;
+                state.analyzing = false;
+                stopCamera();
+
+                if (priceMatch) {
+                    const price = priceMatch[0].replace(',', '.');
+                    state.manualPrice = price;
+                    state.manualName = ''; // On pourrait aussi demander à Gemini de lire le nom !
+                    state.view = 'manual';
+                    showFlash(`✨ Prix détecté par Gemini : ${price} €`);
+                } else {
+                    state.manualPrice = '';
+                    state.view = 'manual';
+                    showFlash("⚠️ Gemini n'a pas vu de prix clair.");
                 }
-            }
 
-            state.scanning = false;
-            state.analyzing = false;
-            stopCamera();
-
-            if (foundPrice) {
-                state.manualPrice = foundPrice;
-                state.manualName = '';
+            } catch (err) {
+                console.error("Erreur Gemini:", err);
+                state.scanning = false;
+                state.analyzing = false;
+                stopCamera();
                 state.view = 'manual';
-                showFlash(`🎯 Prix identifié : ${foundPrice} €`);
-            } else {
-                state.manualPrice = '';
-                state.view = 'manual';
-                showFlash("⚠️ Échec IA. Essayez de vous rapprocher.");
+                showFlash("Erreur de connexion IA.");
             }
             render();
         }
@@ -372,7 +333,7 @@
                     <i data-lucide="calculator" size="20"></i> Saisie
                 </button>
                 <button onclick="setView('scan')" class="flex-1 bg-indigo-600 text-white font-bold py-3 px-6 rounded-2xl shadow-lg shadow-indigo-500/40 flex items-center justify-center gap-2 hover:bg-indigo-700 active:scale-95">
-                    <i data-lucide="brain-circuit" size="20"></i> Scan IA
+                    <i data-lucide="sparkles" size="20"></i> Scan IA
                 </button>
             </div>`;
         }
@@ -386,16 +347,16 @@
                      <div class="relative w-20 h-20 mb-6">
                         <div class="absolute inset-0 rounded-full border-4 border-indigo-900"></div>
                         <div class="absolute inset-0 rounded-full border-4 border-t-indigo-500 animate-spin"></div>
-                        <i data-lucide="brain" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-white w-8 h-8 animate-pulse"></i>
+                        <i data-lucide="sparkles" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-white w-8 h-8 animate-pulse"></i>
                      </div>
-                     <p class="text-white font-bold text-xl animate-pulse">Analyse Neurale</p>
+                     <p class="text-white font-bold text-xl animate-pulse">Analyse Gemini</p>
                      <p class="text-indigo-300 text-sm mt-2 font-mono">${state.analysisStep || 'Initialisation...'}</p>
                 </div>`;
             } else {
                 overlayContent = `
                 <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                      <div class="w-64 h-32 border-2 border-indigo-400/50 rounded-lg relative flex items-center justify-center overflow-hidden">
-                        <div class="scan-line"></div>
+                        <div class="absolute inset-0 scan-overlay"></div>
                         <div class="absolute top-0 left-0 w-4 h-4 border-t-4 border-l-4 border-indigo-500 -mt-1 -ml-1"></div>
                         <div class="absolute top-0 right-0 w-4 h-4 border-t-4 border-r-4 border-indigo-500 -mt-1 -mr-1"></div>
                         <div class="absolute bottom-0 left-0 w-4 h-4 border-b-4 border-l-4 border-indigo-500 -mb-1 -ml-1"></div>
@@ -406,7 +367,7 @@
                 <div class="absolute bottom-10 left-0 right-0 flex justify-center z-50 pointer-events-auto">
                     <button onclick="capturePrice()" class="bg-white rounded-full p-2 shadow-xl shadow-indigo-500/20 active:scale-95 transition-transform group">
                         <div class="w-16 h-16 rounded-full border-4 border-indigo-600 flex items-center justify-center group-hover:bg-indigo-50 transition-colors">
-                            <i data-lucide="scan-eye" class="text-indigo-600 w-8 h-8"></i>
+                            <i data-lucide="aperture" class="text-indigo-600 w-8 h-8"></i>
                         </div>
                     </button>
                 </div>`;
@@ -437,7 +398,7 @@
                             <input type="number" step="0.01" value="${state.manualPrice}" oninput="state.manualPrice = this.value; renderManualViewOnly()" placeholder="0.00" class="w-full pl-4 pr-8 py-3 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none text-2xl font-bold text-slate-800 bg-white" />
                             <span class="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xl">€</span>
                         </div>
-                        ${hasPrice ? '<p class="text-xs text-indigo-600 mt-2 font-medium flex items-center gap-1"><i data-lucide="sparkles" size="12"></i> Validé par l\'IA</p>' : ''}
+                        ${hasPrice ? '<p class="text-xs text-indigo-600 mt-2 font-medium flex items-center gap-1"><i data-lucide="sparkles" size="12"></i> Validé par Gemini</p>' : ''}
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-2">Nom du produit</label>
