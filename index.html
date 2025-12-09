@@ -131,6 +131,33 @@
             state.cameraActive = false;
         }
 
+        // Fonction utilitaire pour améliorer l'image avant OCR
+        // Convertit en niveaux de gris et augmente le contraste (Binarisation simple)
+        function preprocessImage(ctx, width, height) {
+            const imageData = ctx.getImageData(0, 0, width, height);
+            const data = imageData.data;
+            
+            // Seuil pour le noir et blanc (0-255). 
+            // 128 est standard, on peut ajuster si l'image est trop claire/foncée.
+            const threshold = 100; 
+
+            for (let i = 0; i < data.length; i += 4) {
+                // Formule de luminosité standard
+                const avg = (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114);
+                
+                // Binarisation : Si c'est sombre -> Noir total, sinon Blanc total
+                // Cela aide énormément l'OCR à voir les formes nettes
+                const value = avg < threshold ? 0 : 255;
+                
+                data[i] = value;     // R
+                data[i + 1] = value; // G
+                data[i + 2] = value; // B
+                // Alpha reste inchangé
+            }
+            
+            ctx.putImageData(imageData, 0, 0);
+        }
+
         async function capturePrice() {
             const video = document.getElementById('camera-feed');
             if (!video || !videoStream) return;
@@ -141,30 +168,37 @@
 
             // 2. Capture de l'image dans un canvas invisible
             const canvas = document.createElement('canvas');
+            // On capture en résolution native de la vidéo pour plus de précision
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             const ctx = canvas.getContext('2d');
+            
+            // Dessiner l'image brute
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            // --- NOUVEAU : Prétraitement de l'image (Noir & Blanc) ---
+            // Cela aide l'OCR à ne pas être distrait par les couleurs ou ombres
+            preprocessImage(ctx, canvas.width, canvas.height);
 
             // 3. Traitement OCR avec Tesseract.js
             try {
-                // On arrête la caméra pendant l'analyse pour économiser les ressources
-                // stopCamera(); // Optionnel : on peut laisser figé ou arrêter. Ici on laisse tourner en fond ou on fige.
-                
                 const result = await Tesseract.recognize(
                     canvas,
-                    'eng', // 'eng' marche souvent mieux pour les chiffres que 'fra'
+                    'eng', // 'eng' est souvent mieux entraîné pour les chiffres que 'fra'
                     { 
-                        // logger: m => console.log(m) // Décommenter pour debug
+                        // --- NOUVEAU : Paramètres pour forcer la détection de chiffres ---
+                        tessedit_char_whitelist: '0123456789.,€', // On n'accepte QUE ces caractères
+                        tessedit_pageseg_mode: '6', // Mode bloc de texte uniforme (aide parfois pour les étiquettes)
                     }
                 );
 
                 const text = result.data.text;
-                console.log("Texte détecté :", text);
+                console.log("Texte brut OCR :", text);
 
-                // 4. Extraction du prix via Regex (Cherche motif XX.XX ou XX,XX)
-                // Recherche un nombre avec 1 ou 2 décimales, avec point ou virgule
-                const priceRegex = /\b\d+[\.,]\d{2}\b/g; 
+                // 4. Extraction du prix via Regex améliorée
+                // Cherche: Chiffres + (. ou ,) + 1 ou 2 chiffres
+                // Exemples acceptés: "12.99", "5,50", "3.5"
+                const priceRegex = /(\d+[.,]\d{1,2})/g; 
                 const matches = text.match(priceRegex);
 
                 state.scanning = false;
@@ -172,18 +206,22 @@
                 stopCamera();
 
                 if (matches && matches.length > 0) {
-                    // On prend le premier prix trouvé et on normalise (virgule -> point)
-                    const rawPrice = matches[0].replace(',', '.');
-                    state.manualPrice = rawPrice;
+                    // Nettoyage : remplace virgule par point pour le parsing JS
+                    let bestMatch = matches[0].replace(',', '.');
+                    
+                    // Si on a plusieurs matchs, on essaie de prendre celui qui ressemble le plus à un prix réaliste
+                    // (Ici on prend juste le premier pour simplifier)
+                    
+                    state.manualPrice = bestMatch;
                     state.manualName = '';
                     state.view = 'manual';
-                    showFlash(`Prix lu : ${rawPrice} €`);
+                    showFlash(`Prix lu : ${bestMatch} €`);
                 } else {
                     // Échec de lecture
                     state.manualPrice = '';
                     state.manualName = '';
                     state.view = 'manual';
-                    showFlash("Aucun prix clair détecté. Saisie manuelle.");
+                    showFlash("Aucun prix clair détecté. Réessayez.");
                 }
 
             } catch (err) {
@@ -192,7 +230,7 @@
                 state.analyzing = false;
                 stopCamera();
                 state.view = 'manual';
-                showFlash("Erreur lors de l'analyse OCR.");
+                showFlash("Erreur technique OCR.");
             }
             
             render();
@@ -365,7 +403,7 @@
                 <div class="absolute inset-0 flex flex-col items-center justify-center bg-black/60 z-50 backdrop-blur-sm">
                      <div class="w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4"></div>
                      <p class="text-white font-bold text-lg animate-pulse">Lecture du prix...</p>
-                     <p class="text-slate-300 text-sm mt-2">Patientez, analyse de l'image</p>
+                     <p class="text-slate-300 text-sm mt-2">Traitement image (Nettoyage + OCR)</p>
                 </div>`;
             } else {
                 // UI Viseur standard
