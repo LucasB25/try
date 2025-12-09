@@ -8,6 +8,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Tesseract.js pour l'OCR (Lecture de texte sur image) -->
+    <script src='https://unpkg.com/tesseract.js@v2.1.0/dist/tesseract.min.js'></script>
     <style>
         /* Animation pour le flash message */
         @keyframes bounce-in {
@@ -48,7 +50,8 @@
             budget: 50,
             view: 'list', // 'list', 'scan', 'manual'
             scanning: false,
-            cameraActive: false, // Nouvel état pour savoir si la caméra est allumée
+            analyzing: false, // Nouvel état pour l'analyse OCR en cours
+            cameraActive: false, 
             manualName: '',
             manualPrice: '',
             flashMessage: null
@@ -94,20 +97,19 @@
             render();
         }
 
-        // --- GESTION CAMÉRA ---
+        // --- GESTION CAMÉRA & OCR ---
         async function startCamera() {
             state.scanning = true;
-            render(); // Affiche l'interface de scan (avec la balise vidéo vide)
+            state.analyzing = false;
+            render(); 
 
             try {
-                // Demande l'accès à la caméra arrière (environment)
                 const stream = await navigator.mediaDevices.getUserMedia({ 
                     video: { facingMode: "environment" } 
                 });
                 videoStream = stream;
                 state.cameraActive = true;
                 
-                // Attacher le flux à l'élément vidéo
                 const videoElement = document.getElementById('camera-feed');
                 if (videoElement) {
                     videoElement.srcObject = stream;
@@ -115,7 +117,7 @@
                 }
             } catch (err) {
                 console.error("Erreur accès caméra:", err);
-                alert("Impossible d'accéder à la caméra. Vérifiez vos permissions ou utilisez un appareil compatible.");
+                alert("Impossible d'accéder à la caméra. Vérifiez vos permissions ou utilisez HTTPS.");
                 state.scanning = false;
                 setView('list');
             }
@@ -129,21 +131,70 @@
             state.cameraActive = false;
         }
 
-        function capturePrice() {
-            // C'est ici qu'on "simule" la lecture du prix sur l'image capturée
-            // Note: Une vraie OCR en JS pur est trop lourde pour ce fichier unique.
-            
-            state.scanning = false; // Arrête l'animation de scan visuelle (si y'en a une)
-            stopCamera(); // Coupe la caméra
+        async function capturePrice() {
+            const video = document.getElementById('camera-feed');
+            if (!video || !videoStream) return;
 
-            // Simulation : Prix aléatoire "intelligent" (ex: 2.99, 4.50...)
-            const randomPrice = (Math.random() * 15 + 0.50).toFixed(2);
+            // 1. Passage en mode Analyse (UI Loading)
+            state.analyzing = true;
+            render(); // Met à jour l'UI pour montrer le spinner
+
+            // 2. Capture de l'image dans un canvas invisible
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // 3. Traitement OCR avec Tesseract.js
+            try {
+                // On arrête la caméra pendant l'analyse pour économiser les ressources
+                // stopCamera(); // Optionnel : on peut laisser figé ou arrêter. Ici on laisse tourner en fond ou on fige.
+                
+                const result = await Tesseract.recognize(
+                    canvas,
+                    'eng', // 'eng' marche souvent mieux pour les chiffres que 'fra'
+                    { 
+                        // logger: m => console.log(m) // Décommenter pour debug
+                    }
+                );
+
+                const text = result.data.text;
+                console.log("Texte détecté :", text);
+
+                // 4. Extraction du prix via Regex (Cherche motif XX.XX ou XX,XX)
+                // Recherche un nombre avec 1 ou 2 décimales, avec point ou virgule
+                const priceRegex = /\b\d+[\.,]\d{2}\b/g; 
+                const matches = text.match(priceRegex);
+
+                state.scanning = false;
+                state.analyzing = false;
+                stopCamera();
+
+                if (matches && matches.length > 0) {
+                    // On prend le premier prix trouvé et on normalise (virgule -> point)
+                    const rawPrice = matches[0].replace(',', '.');
+                    state.manualPrice = rawPrice;
+                    state.manualName = '';
+                    state.view = 'manual';
+                    showFlash(`Prix lu : ${rawPrice} €`);
+                } else {
+                    // Échec de lecture
+                    state.manualPrice = '';
+                    state.manualName = '';
+                    state.view = 'manual';
+                    showFlash("Aucun prix clair détecté. Saisie manuelle.");
+                }
+
+            } catch (err) {
+                console.error(err);
+                state.scanning = false;
+                state.analyzing = false;
+                stopCamera();
+                state.view = 'manual';
+                showFlash("Erreur lors de l'analyse OCR.");
+            }
             
-            state.manualPrice = randomPrice;
-            state.manualName = ''; 
-            
-            state.view = 'manual'; 
-            showFlash(`Prix détecté : ${randomPrice} €`);
             render();
         }
 
@@ -306,10 +357,19 @@
 
         function renderScannerView() {
             // Contenu de la zone caméra
-            const cameraContent = `
-                <video id="camera-feed" autoplay playsinline muted></video>
-                
-                <!-- Overlay Viseur -->
+            let overlayContent = '';
+
+            if (state.analyzing) {
+                // UI Pendant l'analyse OCR
+                overlayContent = `
+                <div class="absolute inset-0 flex flex-col items-center justify-center bg-black/60 z-50 backdrop-blur-sm">
+                     <div class="w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                     <p class="text-white font-bold text-lg animate-pulse">Lecture du prix...</p>
+                     <p class="text-slate-300 text-sm mt-2">Patientez, analyse de l'image</p>
+                </div>`;
+            } else {
+                // UI Viseur standard
+                overlayContent = `
                 <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                      <div class="w-64 h-32 border-2 border-white/50 rounded-lg relative flex items-center justify-center bg-transparent backdrop-blur-[2px]">
                         <div class="absolute top-0 left-0 w-4 h-4 border-t-4 border-l-4 border-indigo-500 -mt-1 -ml-1"></div>
@@ -317,7 +377,7 @@
                         <div class="absolute bottom-0 left-0 w-4 h-4 border-b-4 border-l-4 border-indigo-500 -mb-1 -ml-1"></div>
                         <div class="absolute bottom-0 right-0 w-4 h-4 border-b-4 border-r-4 border-indigo-500 -mb-1 -mr-1"></div>
                         
-                        <span class="text-white/80 font-medium text-sm bg-black/30 px-2 py-1 rounded">Visez le prix</span>
+                        <span class="text-white/80 font-medium text-sm bg-black/30 px-2 py-1 rounded">Visez le prix bien au centre</span>
                      </div>
                 </div>
 
@@ -325,10 +385,17 @@
                 <div class="absolute bottom-10 left-0 right-0 flex justify-center z-50 pointer-events-auto">
                     <button onclick="capturePrice()" class="bg-white rounded-full p-1 shadow-xl active:scale-95 transition-transform">
                         <div class="w-16 h-16 rounded-full border-4 border-indigo-600 flex items-center justify-center">
-                            <div class="w-12 h-12 bg-indigo-600 rounded-full"></div>
+                            <div class="w-12 h-12 bg-indigo-600 rounded-full flex items-center justify-center">
+                                <i data-lucide="aperture" class="text-white w-6 h-6"></i>
+                            </div>
                         </div>
                     </button>
-                </div>
+                </div>`;
+            }
+
+            const cameraContent = `
+                <video id="camera-feed" autoplay playsinline muted></video>
+                ${overlayContent}
             `;
 
             return `
@@ -336,9 +403,10 @@
                 <div class="flex-1 relative overflow-hidden bg-black">
                     ${cameraContent}
                     
+                    ${!state.analyzing ? `
                     <button onclick="setView('list')" class="absolute top-4 right-4 bg-black/40 text-white p-2 rounded-full hover:bg-black/60 backdrop-blur-sm z-50">
                         <i data-lucide="x" size="24"></i>
-                    </button>
+                    </button>` : ''}
                 </div>
             </div>`;
         }
@@ -373,7 +441,7 @@
                             />
                             <span class="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xl">€</span>
                         </div>
-                        ${state.manualPrice ? '<p class="text-xs text-indigo-600 mt-2 font-medium">✨ Prix capturé (Simulation)</p>' : ''}
+                        ${state.manualPrice ? '<p class="text-xs text-indigo-600 mt-2 font-medium">✨ Prix extrait de l\'image</p>' : ''}
                     </div>
 
                     <div>
@@ -400,7 +468,6 @@
             </div>`;
         }
 
-        // Fonction spéciale pour update input sans perdre focus (optimisation simple)
         function renderManualViewOnly() {
            const btn = document.querySelector('button[type="submit"]');
            if(btn) {
@@ -444,20 +511,22 @@
                 </div>`;
             }
 
-            // Important: Ne pas écraser le contenu si on est en mode scan et qu'on a déjà la vidéo
-            // Sinon on perd le flux vidéo à chaque petit changement d'état (ex: flash message)
+            // Ne pas écraser si la vidéo est déjà active et qu'on est en mode scan
             if (state.view === 'scan' && document.getElementById('camera-feed')) {
-                 // On update seulement les overlays si besoin, mais ici simple implementation:
-                 // Pour simplifier, on ne réinjecte pas tout le HTML si la vidéo tourne déjà
-                 // Sauf si on veut afficher le flash message par dessus
-                 const flashContainer = document.getElementById('flash-container');
-                 if (!flashContainer && flashHtml) {
-                     const div = document.createElement('div');
-                     div.id = 'flash-container';
-                     div.innerHTML = flashHtml;
-                     app.appendChild(div.firstChild);
+                 // Si on passe en mode "Analysing", il faut re-rendre pour montrer le spinner
+                 // Sinon, on garde la structure actuelle
+                 if (state.analyzing && !document.querySelector('.animate-spin')) {
+                     // Force re-render pour montrer le loader
+                 } else {
+                     const flashContainer = document.getElementById('flash-container');
+                     if (!flashContainer && flashHtml) {
+                         const div = document.createElement('div');
+                         div.id = 'flash-container';
+                         div.innerHTML = flashHtml;
+                         app.appendChild(div.firstChild);
+                     }
+                     return;
                  }
-                 return;
             }
 
             app.innerHTML = mainContent + flashHtml;
